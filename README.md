@@ -6,7 +6,7 @@
 ![Vite](https://img.shields.io/badge/Vite-7.0-646CFF)
 ![PWA](https://img.shields.io/badge/PWA-Enabled-green)
 
-Une application moderne de gestion de listes avec style glassmorphism, optimisée pour mobile, avec support offline et synchronisation.
+Une application moderne de gestion de listes avec style glassmorphism, optimisée pour mobile, avec support offline, synchronisation et fonctionnalités intelligentes.
 
 ## ✨ Fonctionnalités
 
@@ -15,10 +15,36 @@ Une application moderne de gestion de listes avec style glassmorphism, optimisé
 - **Dossiers** : Organisez vos listes par dossiers colorés
 - **Priorités** : Définissez des priorités (Basse, Normale, Haute, Urgente)
 - **Dates d'échéance** : Ajoutez des dates limites à vos éléments
-- **Drag & Drop** : Réordonnez facilement vos éléments
+- **Drag & Drop** : Réordonnez facilement vos listes et éléments
 - **Recherche** : Trouvez rapidement vos listes et éléments
+- **Archivage** : Archivez les éléments terminés
+
+### 🎤 Saisie Vocale
+- **Reconnaissance vocale** : Ajoutez des éléments en parlant (Web Speech API)
+- **Parsing intelligent** : Sépare automatiquement les éléments ("lait, pain et beurre")
+- **Extraction de priorités** : Détecte les mots-clés comme "urgent", "important"
+- **Support français** : Optimisé pour la langue française
+
+### 🏷️ Catégorisation Automatique
+- **Dictionnaire local** : ~300 mots-clés pour les courses
+- **8 catégories** : Fruits & Légumes, Produits Laitiers, Boulangerie, Viandes & Poissons, Surgelés, Épicerie, Boissons, Hygiène & Maison
+- **Vue groupée** : Affichez les éléments par catégorie
+- **Couleurs distinctives** : Chaque catégorie a sa couleur
+
+### ⭐ Suggestions Rapides
+- **Articles fréquents** : Suggestions basées sur votre historique
+- **Ajout en un tap** : Cliquez sur une suggestion pour l'ajouter
+- **Compteur d'utilisation** : Vos articles les plus utilisés en premier
+
+### 📅 Rappels & Calendrier
+- **DateTimePicker** : Calendrier avec navigation mensuelle
+- **Options rapides** : "Dans 1h", "Demain 9h", "Semaine prochaine"
+- **Vue calendrier** : Page dédiée avec vue mensuelle
+- **Indicateurs visuels** : À venir (bleu), En retard (rouge), Complété (vert)
+- **Notifications** : Rappels 1h avant et alertes de retard
 
 ### 👆 Interface Mobile
+- **Swipe gestures** : Glissez pour compléter ou supprimer
 - **Navigation par onglets** : Barre de navigation fixe en bas de l'écran
 - **Bouton d'action flottant** : Créez rapidement une nouvelle liste
 - **Design responsive** : Optimisé pour mobile et desktop
@@ -33,10 +59,6 @@ Une application moderne de gestion de listes avec style glassmorphism, optimisé
 - **Indicateur de connexion** : Voyez quand vous êtes hors ligne
 - **File d'attente** : Les modifications sont synchronisées automatiquement
 - **Service Worker** : PWA installable pour accès rapide
-
-### 🔔 Notifications
-- **Rappels** : Recevez des notifications pour les tâches à échéance
-- **Alertes de retard** : Soyez notifié des éléments en retard
 
 ### 👥 Partage
 - **Partage de listes** : Partagez vos listes avec d'autres utilisateurs
@@ -53,6 +75,7 @@ Une application moderne de gestion de listes avec style glassmorphism, optimisé
 | **Backend** | Supabase (PostgreSQL) |
 | **Drag & Drop** | @dnd-kit |
 | **Gestes** | @use-gesture/react |
+| **Dates** | date-fns |
 | **PWA** | vite-plugin-pwa |
 
 ## 🚀 Installation
@@ -78,7 +101,13 @@ npm install
 3. **Configurez Supabase**
 - Créez un projet sur [supabase.com](https://supabase.com)
 - Exécutez le script SQL dans `supabase/schema.sql` dans l'éditeur SQL Supabase
-- Exécutez les migrations dans `supabase/migration_*.sql`
+- Exécutez les migrations dans l'ordre :
+  ```
+  supabase/migrations/add_is_archived.sql
+  supabase/migrations/add_lists_position.sql
+  supabase/migrations/add_frequent_items.sql
+  supabase/migrations/add_reminders.sql
+  ```
 - Copiez vos identifiants depuis Settings > API
 
 4. **Configurez les variables d'environnement**
@@ -135,27 +164,39 @@ src/
 ├── components/          # Composants React
 │   ├── ui/              # Composants UI réutilisables (shadcn/ui)
 │   ├── BottomTabBar.tsx # Navigation mobile
+│   ├── CalendarView.tsx # Vue calendrier mensuelle
 │   ├── CreateListDialog.tsx
+│   ├── DateTimePicker.tsx # Sélecteur date/heure
+│   ├── DraggableList.tsx # Liste réordonnables
 │   ├── FolderManager.tsx
+│   ├── FrequentItemsSuggestions.tsx # Suggestions articles fréquents
 │   ├── Header.tsx
 │   ├── ListDetail.tsx
 │   ├── SearchBar.tsx
 │   ├── ShareDialog.tsx
-│   └── SwipeableItem.tsx
+│   ├── SwipeableItem.tsx
+│   └── VoiceInputButton.tsx # Bouton saisie vocale
 ├── hooks/               # Hooks React personnalisés
 │   ├── useNotifications.ts
 │   ├── useOnlineStatus.ts
+│   ├── useSpeechRecognition.ts # Hook reconnaissance vocale
 │   └── useTheme.ts
 ├── lib/                 # Utilitaires et configuration
+│   ├── categorizer.ts   # Logique de catégorisation
+│   ├── categoryDictionary.ts # Dictionnaire catégories
 │   ├── notifications.ts
 │   ├── supabase.ts
-│   └── utils.ts
+│   ├── utils.ts
+│   └── voiceParser.ts   # Parser entrée vocale
 ├── pages/               # Pages principales
+│   ├── CalendarPage.tsx # Page calendrier
 │   ├── DashboardPage.tsx
 │   └── LoginPage.tsx
 ├── stores/              # Stores Zustand
 │   ├── folderStore.ts
+│   ├── frequentItemsStore.ts # Articles fréquents
 │   ├── listStore.ts
+│   ├── reminderStore.ts # Rappels
 │   ├── shareStore.ts
 │   └── syncStore.ts
 ├── types/               # Types TypeScript
@@ -187,11 +228,24 @@ src/
 - **lists** : Listes (courses, tâches, idées, notes)
 - **list_items** : Éléments des listes
 - **shared_lists** : Partage de listes entre utilisateurs
+- **frequent_items** : Articles fréquemment utilisés
+- **reminders** : Rappels programmés
 
 ### Colonnes importantes
 - `priority` : low, normal, high, urgent
 - `due_date` : Date d'échéance pour les rappels
 - `position` : Ordre d'affichage
+- `grocery_category` : Catégorie automatique pour les courses
+- `is_archived` : Archivage des éléments terminés
+
+## 🎙️ Compatibilité Saisie Vocale
+
+| Navigateur | Support |
+|------------|---------|
+| Chrome | ✅ Complet |
+| Edge | ✅ Complet |
+| Safari | ⚠️ Partiel (iOS variable) |
+| Firefox | ❌ Non supporté |
 
 ## 🤝 Contribution
 
@@ -218,7 +272,8 @@ Ce projet est sous licence MIT.
 - [Tailwind CSS](https://tailwindcss.com) pour le styling
 - [Vite](https://vitejs.dev) pour le build tool
 - [Lucide](https://lucide.dev) pour les icônes
+- [date-fns](https://date-fns.org) pour la manipulation des dates
 
 ---
 
-**Note** : N'oubliez pas de remplir le fichier `.env` avec vos propres identifiants Supabase avant de lancer l'application !
+**Note** : N'oubliez pas de remplir le fichier `.env` avec vos propres identifiants Supabase et d'exécuter toutes les migrations avant de lancer l'application !
