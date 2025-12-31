@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { LogOut, Sun, Moon, Monitor, ClipboardList, WifiOff, RotateCw, Calendar } from 'lucide-react'
+import { LogOut, Sun, Moon, Monitor, ClipboardList, WifiOff, RotateCw, Calendar, Bell, BellOff } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { useSyncStore } from '@/stores/syncStore'
+import { useNotifications } from '@/hooks/useNotifications'
 import { useLocation } from 'react-router-dom'
 
 export function Header() {
@@ -13,6 +14,7 @@ export function Header() {
   const { theme, toggleTheme } = useTheme()
   const isOnline = useOnlineStatus()
   const { pendingOperations, isSyncing, setOnlineStatus } = useSyncStore()
+  const { isEnabled: notificationsEnabled, requestPermission } = useNotifications()
   const location = useLocation()
 
   // Sync online status with store
@@ -78,6 +80,19 @@ export function Header() {
               </Button>
             </Link>
           )}
+          <Button
+            variant="glass"
+            size="icon"
+            onClick={requestPermission}
+            title={notificationsEnabled ? 'Notifications activées' : 'Activer les notifications'}
+            className="rounded-xl"
+          >
+            {notificationsEnabled ? (
+              <Bell className="h-5 w-5 text-green-500" />
+            ) : (
+              <BellOff className="h-5 w-5 text-muted-foreground" />
+            )}
+          </Button>
           <Button
             variant="glass"
             size="icon"
