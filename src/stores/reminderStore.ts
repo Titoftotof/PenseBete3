@@ -58,9 +58,12 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       .single()
 
     if (error) {
+      console.error('Erreur création rappel:', error)
       set({ error: error.message, loading: false })
       return null
     }
+
+    console.log('Rappel créé:', data)
 
     set((state) => ({
       reminders: [...state.reminders, data],

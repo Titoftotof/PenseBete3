@@ -6,13 +6,13 @@ import { SwipeableItem } from '@/components/SwipeableItem'
 import { FrequentItemsSuggestions } from '@/components/FrequentItemsSuggestions'
 import { VoiceInputButton } from '@/components/VoiceInputButton'
 import { DateTimePicker } from '@/components/DateTimePicker'
-import { ArrowLeft, Plus, Trash2, Check, GripVertical, Flag, Calendar, Archive, Undo, Layers, List as ListIcon, Bell, BellOff } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Check, GripVertical, Flag, Archive, Undo, Layers, List as ListIcon, Bell, BellOff } from 'lucide-react'
 import { useListStore } from '@/stores/listStore'
 import { useFrequentItemsStore } from '@/stores/frequentItemsStore'
 import { useReminderStore } from '@/stores/reminderStore'
 import { parseVoiceInputWithPriorities } from '@/lib/voiceParser'
 import { categorizeItem, getCategoryColor } from '@/lib/categorizer'
-import type { List, ListItem, Priority } from '@/types'
+import type { List, ListItem, Priority, Reminder } from '@/types'
 import {
   DndContext,
   closestCenter,
@@ -38,6 +38,7 @@ interface ListDetailProps {
 
 interface SortableItemProps {
   item: ListItem
+  reminder: Reminder | null
   onToggle: () => void
   onDelete: () => void
   onUpdatePriority: (priority: Priority) => void
@@ -54,7 +55,7 @@ const PRIORITY_CONFIG: Record<Priority, { color: string; label: string }> = {
 
 const PRIORITIES: Priority[] = ['low', 'normal', 'high', 'urgent']
 
-function SortableItem({ item, onToggle, onDelete, onUpdatePriority, onSetReminder, onRemoveReminder }: SortableItemProps) {
+function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, onSetReminder, onRemoveReminder }: SortableItemProps) {
   const [showPriorityMenu, setShowPriorityMenu] = useState(false)
   const {
     attributes,
@@ -74,7 +75,17 @@ function SortableItem({ item, onToggle, onDelete, onUpdatePriority, onSetReminde
   const priority = item.priority || 'normal'
   const priorityConfig = PRIORITY_CONFIG[priority]
 
-  const isOverdue = item.due_date && new Date(item.due_date) < new Date() && !item.is_completed
+  // Use reminder time if available, otherwise fall back to due_date
+  const reminderTime = reminder?.reminder_time || item.due_date
+  const isOverdue = reminderTime && new Date(reminderTime) < new Date() && !item.is_completed
+
+  // Format date and time
+  const formatReminderDateTime = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const dateFormatted = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+    const timeFormatted = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    return `${dateFormatted} à ${timeFormatted}`
+  }
 
   const itemContent = (
     <GlassCard className={`group ${isOverdue ? 'border-red-500/50 bg-red-500/10' : ''}`} hover={false} style={style}>
@@ -102,10 +113,10 @@ function SortableItem({ item, onToggle, onDelete, onUpdatePriority, onSetReminde
           <span className={`block truncate ${item.is_completed ? 'line-through opacity-60' : ''}`}>
             {item.content}
           </span>
-          {item.due_date && (
-            <span className={`text-xs flex items-center gap-1 mt-0.5 ${isOverdue ? 'text-red-500' : 'text-muted-foreground'}`}>
-              <Calendar className="h-3 w-3" />
-              {new Date(item.due_date).toLocaleDateString('fr-FR')}
+          {reminderTime && (
+            <span className={`text-xs flex items-center gap-1 mt-0.5 ${isOverdue ? 'text-red-500' : 'text-purple-500'}`}>
+              <Bell className="h-3 w-3" />
+              {formatReminderDateTime(reminderTime)}
             </span>
           )}
         </div>
@@ -142,11 +153,11 @@ function SortableItem({ item, onToggle, onDelete, onUpdatePriority, onSetReminde
 
         {/* Reminder button */}
         <div data-no-swipe="true">
-          {item.due_date ? (
+          {reminderTime ? (
             <button
               onClick={onRemoveReminder}
               className="p-2 rounded-xl hover:bg-accent transition-colors text-purple-500"
-              title={`Supprimer le rappel (${new Date(item.due_date).toLocaleDateString('fr-FR')})`}
+              title={`Modifier le rappel (${formatReminderDateTime(reminderTime)})`}
             >
               <Bell className="h-4 w-4" />
             </button>
@@ -399,6 +410,7 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
                     <SortableItem
                       key={item.id}
                       item={item}
+                      reminder={getReminderByItemId(item.id)}
                       onToggle={() => toggleItemComplete(item.id)}
                       onDelete={() => deleteItem(item.id)}
                       onUpdatePriority={(priority) => handleUpdatePriority(item.id, priority)}
@@ -423,6 +435,7 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
                 <SortableItem
                   key={item.id}
                   item={item}
+                  reminder={getReminderByItemId(item.id)}
                   onToggle={() => toggleItemComplete(item.id)}
                   onDelete={() => deleteItem(item.id)}
                   onUpdatePriority={(priority) => handleUpdatePriority(item.id, priority)}
