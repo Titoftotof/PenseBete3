@@ -136,10 +136,10 @@ export function Header() {
               <>
                 {/* Backdrop to close menu */}
                 <div
-                  className="fixed inset-0 z-40"
+                  className="fixed inset-0 z-[60]"
                   onClick={() => setShowRemindersMenu(false)}
                 />
-                <div className="absolute right-0 top-full mt-2 w-80 bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="fixed right-4 top-16 w-80 max-w-[calc(100vw-2rem)] bg-background border border-border rounded-xl shadow-2xl z-[70] overflow-hidden">
                   <div className="p-4 border-b border-border bg-purple-500/10">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-base flex items-center gap-2">
@@ -218,14 +218,20 @@ export function Header() {
                         </p>
                       </div>
                     )}
-                    {notificationsEnabled && (
+                    {/* Test button - show if browser permission is granted */}
+                    {status?.permission === 'granted' && (
                       <button
                         onClick={() => {
-                          sendNotification(
-                            '🔔 Test de notification',
-                            'Les notifications fonctionnent correctement !',
-                            { test: true }
-                          )
+                          // Force send notification even if app notifications are disabled
+                          try {
+                            new Notification('🔔 Test de notification', {
+                              body: 'Les notifications fonctionnent correctement !',
+                              icon: '/icon.svg'
+                            })
+                          } catch (e) {
+                            console.error('Erreur notification:', e)
+                            alert('Erreur lors de l\'envoi de la notification')
+                          }
                         }}
                         className="text-sm w-full text-center py-2.5 px-4 rounded-lg font-medium transition-colors bg-purple-500/15 text-purple-500 hover:bg-purple-500/25"
                       >
