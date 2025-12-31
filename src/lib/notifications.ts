@@ -50,7 +50,23 @@ class NotificationService {
   }
 
   isEnabled(): boolean {
-    return this.permission === 'granted' || localStorage.getItem(NOTIFICATIONS_ENABLED_KEY) === 'granted'
+    const saved = localStorage.getItem(NOTIFICATIONS_ENABLED_KEY)
+    if (saved === 'disabled') return false
+    return this.permission === 'granted' || saved === 'granted'
+  }
+
+  disable(): void {
+    this.permission = 'default'
+    localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'disabled')
+    this.stopReminderCheck()
+  }
+
+  enable(): void {
+    if (Notification.permission === 'granted') {
+      this.permission = 'granted'
+      localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'granted')
+      this.startReminderCheck()
+    }
   }
 
   sendNotification(title: string, body: string, data?: any) {

@@ -17,7 +17,7 @@ export function Header() {
   const { theme, toggleTheme } = useTheme()
   const isOnline = useOnlineStatus()
   const { pendingOperations, isSyncing, setOnlineStatus } = useSyncStore()
-  const { isEnabled: notificationsEnabled, requestPermission } = useNotifications()
+  const { isEnabled: notificationsEnabled, toggleNotifications } = useNotifications()
   const { fetchReminders, getUpcomingReminders, deleteReminder } = useReminderStore()
   const { items } = useListStore()
   const location = useLocation()
@@ -115,13 +115,7 @@ export function Header() {
             <Button
               variant="glass"
               size="icon"
-              onClick={() => {
-                if (!notificationsEnabled) {
-                  requestPermission()
-                } else {
-                  setShowRemindersMenu(!showRemindersMenu)
-                }
-              }}
+              onClick={() => setShowRemindersMenu(!showRemindersMenu)}
               title={notificationsEnabled ? `${reminderCount} rappel(s) actif(s)` : 'Activer les notifications'}
               className="rounded-xl"
             >
@@ -189,16 +183,23 @@ export function Header() {
                     ))
                   )}
                 </div>
-                {!notificationsEnabled && (
-                  <div className="p-3 border-t border-white/10 bg-orange-500/10">
-                    <button
-                      onClick={requestPermission}
-                      className="text-xs text-orange-500 hover:underline w-full text-center"
-                    >
-                      Activer les notifications du navigateur
-                    </button>
-                  </div>
-                )}
+                <div className="p-3 border-t border-white/10">
+                  <button
+                    onClick={() => {
+                      toggleNotifications()
+                      if (notificationsEnabled) {
+                        setShowRemindersMenu(false)
+                      }
+                    }}
+                    className={`text-xs w-full text-center py-2 px-3 rounded-lg transition-colors ${
+                      notificationsEnabled
+                        ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                        : 'bg-green-500/10 text-green-500 hover:bg-green-500/20'
+                    }`}
+                  >
+                    {notificationsEnabled ? 'Désactiver les notifications' : 'Activer les notifications'}
+                  </button>
+                </div>
               </div>
             )}
           </div>

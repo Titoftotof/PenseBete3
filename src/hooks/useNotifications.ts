@@ -27,6 +27,30 @@ export function useNotifications() {
     return granted
   }
 
+  const disableNotifications = () => {
+    notificationService.disable()
+    setIsEnabled(false)
+  }
+
+  const enableNotifications = () => {
+    notificationService.enable()
+    setIsEnabled(notificationService.isEnabled())
+  }
+
+  const toggleNotifications = async () => {
+    if (isEnabled) {
+      disableNotifications()
+    } else {
+      // If browser permission is granted, just enable
+      if (Notification.permission === 'granted') {
+        enableNotifications()
+      } else {
+        // Otherwise request permission
+        await requestPermission()
+      }
+    }
+  }
+
   const sendNotification = (title: string, body: string, data?: any) => {
     notificationService.sendNotification(title, body, data)
   }
@@ -35,6 +59,9 @@ export function useNotifications() {
     permission,
     isEnabled,
     requestPermission,
+    disableNotifications,
+    enableNotifications,
+    toggleNotifications,
     sendNotification
   }
 }
