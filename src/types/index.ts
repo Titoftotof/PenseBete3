@@ -17,6 +17,7 @@ export interface ListItem {
   list_id: string
   content: string
   is_completed: boolean
+  is_archived: boolean
   position: number
   priority: Priority
   due_date?: string

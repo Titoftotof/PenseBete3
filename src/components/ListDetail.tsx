@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GlassCard, GlassCardContent } from '@/components/ui/glass-card'
 import { SwipeableItem } from '@/components/SwipeableItem'
-import { ArrowLeft, Plus, Trash2, Check, GripVertical, Flag, Calendar } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Check, GripVertical, Flag, Calendar, Archive, Undo } from 'lucide-react'
 import { useListStore } from '@/stores/listStore'
 import type { List, ListItem, Priority } from '@/types'
 import {
@@ -149,7 +149,8 @@ function SortableItem({ item, onToggle, onDelete, onUpdatePriority }: SortableIt
 
 export function ListDetail({ list, onBack }: ListDetailProps) {
   const [newItemContent, setNewItemContent] = useState('')
-  const { items, fetchItems, createItem, toggleItemComplete, deleteItem, updateItem, reorderItems, loading } = useListStore()
+  const [showArchived, setShowArchived] = useState(false)
+  const { items, fetchItems, createItem, toggleItemComplete, deleteItem, updateItem, reorderItems, archiveItem, unarchiveItem, loading } = useListStore()
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -191,7 +192,7 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
 
   // Sort items: urgent first, then by priority, then by position
   const sortedPendingItems = items
-    .filter((item) => !item.is_completed)
+    .filter((item) => !item.is_completed && !item.is_archived)
     .sort((a, b) => {
       const priorityOrder = { urgent: 0, high: 1, normal: 2, low: 3 }
       const aPriority = priorityOrder[a.priority || 'normal']
@@ -200,7 +201,8 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
       return a.position - b.position
     })
 
-  const completedItems = items.filter((item) => item.is_completed)
+  const completedItems = items.filter((item) => item.is_completed && !item.is_archived)
+  const archivedItems = items.filter((item) => item.is_archived)
 
   return (
     <div className="space-y-4">
@@ -275,21 +277,80 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
                 <button
                   onClick={() => toggleItemComplete(item.id)}
                   className="h-6 w-6 rounded-lg border-2 border-primary bg-primary flex items-center justify-center"
+                  data-no-swipe="true"
                 >
                   <Check className="h-3.5 w-3.5 text-primary-foreground" />
                 </button>
                 <span className="flex-1 line-through">{item.content}</span>
-                <Button
-                  variant="glass"
-                  size="icon"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-red-500"
-                  onClick={() => deleteItem(item.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-1" data-no-swipe="true">
+                  <Button
+                    variant="glass"
+                    size="icon"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-blue-500"
+                    onClick={() => archiveItem(item.id)}
+                    title="Archiver"
+                  >
+                    <Archive className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="glass"
+                    size="icon"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-red-500"
+                    onClick={() => deleteItem(item.id)}
+                    title="Supprimer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </GlassCardContent>
             </GlassCard>
           ))}
+        </div>
+      )}
+
+      {/* Archived items section */}
+      {archivedItems.length > 0 && (
+        <div className="space-y-2">
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className="text-sm font-medium text-muted-foreground flex items-center gap-2 hover:text-foreground transition-colors"
+          >
+            <Archive className="h-4 w-4" />
+            Archivés ({archivedItems.length})
+            <span className={`transition-transform ${showArchived ? 'rotate-180' : ''}`}>▼</span>
+          </button>
+          {showArchived && (
+            <div className="space-y-2">
+              {archivedItems.map((item) => (
+                <GlassCard key={item.id} className="group opacity-40" hover={false}>
+                  <GlassCardContent className="flex items-center gap-3 p-3">
+                    <Archive className="h-4 w-4 text-muted-foreground" />
+                    <span className="flex-1 line-through text-sm">{item.content}</span>
+                    <div className="flex gap-1" data-no-swipe="true">
+                      <Button
+                        variant="glass"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-blue-500"
+                        onClick={() => unarchiveItem(item.id)}
+                        title="Désarchiver"
+                      >
+                        <Undo className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="glass"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-red-500"
+                        onClick={() => deleteItem(item.id)}
+                        title="Supprimer"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </GlassCardContent>
+                </GlassCard>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

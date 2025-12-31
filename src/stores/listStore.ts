@@ -20,9 +20,11 @@ interface ListStore {
   // Items
   fetchItems: (listId: string) => Promise<void>
   createItem: (listId: string, content: string) => Promise<ListItem | null>
-  updateItem: (id: string, updates: Partial<Pick<ListItem, 'content' | 'is_completed' | 'position' | 'priority' | 'due_date'>>) => Promise<void>
+  updateItem: (id: string, updates: Partial<Pick<ListItem, 'content' | 'is_completed' | 'is_archived' | 'position' | 'priority' | 'due_date'>>) => Promise<void>
   deleteItem: (id: string) => Promise<void>
   toggleItemComplete: (id: string) => Promise<void>
+  archiveItem: (id: string) => Promise<void>
+  unarchiveItem: (id: string) => Promise<void>
   reorderItems: (items: ListItem[]) => Promise<void>
 }
 
@@ -223,6 +225,16 @@ export const useListStore = create<ListStore>((set, get) => ({
     if (!item) return
 
     await get().updateItem(id, { is_completed: !item.is_completed })
+  },
+
+  // Archive an item
+  archiveItem: async (id: string) => {
+    await get().updateItem(id, { is_archived: true })
+  },
+
+  // Unarchive an item
+  unarchiveItem: async (id: string) => {
+    await get().updateItem(id, { is_archived: false })
   },
 
   // Reorder items (for drag and drop)
