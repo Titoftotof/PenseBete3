@@ -139,7 +139,7 @@ export function Header() {
                   className="fixed inset-0 z-[60]"
                   onClick={() => setShowRemindersMenu(false)}
                 />
-                <div className="fixed right-4 top-16 w-80 max-w-[calc(100vw-2rem)] bg-background border border-border rounded-xl shadow-2xl z-[70] overflow-hidden">
+                <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-80 max-w-[calc(100vw-2rem)] max-h-[80vh] bg-background border border-border rounded-xl shadow-2xl z-[70] overflow-hidden flex flex-col">
                   <div className="p-4 border-b border-border bg-purple-500/10">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-base flex items-center gap-2">
@@ -154,7 +154,7 @@ export function Header() {
                       </button>
                     </div>
                   </div>
-                  <div className="max-h-72 overflow-y-auto">
+                  <div className="flex-1 overflow-y-auto">
                     {upcomingReminders.length === 0 ? (
                       <div className="p-6 text-center text-sm text-muted-foreground">
                         <Bell className="h-8 w-8 mx-auto mb-2 opacity-30" />
