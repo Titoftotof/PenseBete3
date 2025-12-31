@@ -1,0 +1,245 @@
+import { create } from 'zustand'
+import { supabase } from '@/lib/supabase'
+import type { List, ListItem, ListCategory } from '@/types'
+
+interface ListStore {
+  lists: List[]
+  currentList: List | null
+  items: ListItem[]
+  loading: boolean
+  error: string | null
+
+  // Lists
+  fetchLists: () => Promise<void>
+  fetchListsByCategory: (category: ListCategory) => Promise<void>
+  createList: (name: string, category: ListCategory) => Promise<List | null>
+  updateList: (id: string, updates: Partial<Pick<List, 'name' | 'category' | 'folder_id'>>) => Promise<void>
+  deleteList: (id: string) => Promise<void>
+  setCurrentList: (list: List | null) => void
+
+  // Items
+  fetchItems: (listId: string) => Promise<void>
+  createItem: (listId: string, content: string) => Promise<ListItem | null>
+  updateItem: (id: string, updates: Partial<Pick<ListItem, 'content' | 'is_completed' | 'position' | 'priority' | 'due_date'>>) => Promise<void>
+  deleteItem: (id: string) => Promise<void>
+  toggleItemComplete: (id: string) => Promise<void>
+  reorderItems: (items: ListItem[]) => Promise<void>
+}
+
+export const useListStore = create<ListStore>((set, get) => ({
+  lists: [],
+  currentList: null,
+  items: [],
+  loading: false,
+  error: null,
+
+  // Fetch all lists for current user
+  fetchLists: async () => {
+    set({ loading: true, error: null })
+    const { data, error } = await supabase
+      .from('lists')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      set({ error: error.message, loading: false })
+    } else {
+      set({ lists: data || [], loading: false })
+    }
+  },
+
+  // Fetch lists by category
+  fetchListsByCategory: async (category: ListCategory) => {
+    set({ loading: true, error: null })
+    const { data, error } = await supabase
+      .from('lists')
+      .select('*')
+      .eq('category', category)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      set({ error: error.message, loading: false })
+    } else {
+      set({ lists: data || [], loading: false })
+    }
+  },
+
+  // Create a new list
+  createList: async (name: string, category: ListCategory) => {
+    set({ loading: true, error: null })
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      set({ error: 'Non authentifié', loading: false })
+      return null
+    }
+
+    const { data, error } = await supabase
+      .from('lists')
+      .insert({ name, category, user_id: user.id })
+      .select()
+      .single()
+
+    if (error) {
+      set({ error: error.message, loading: false })
+      return null
+    }
+
+    set((state) => ({
+      lists: [data, ...state.lists],
+      loading: false
+    }))
+    return data
+  },
+
+  // Update a list
+  updateList: async (id: string, updates) => {
+    set({ loading: true, error: null })
+    const { error } = await supabase
+      .from('lists')
+      .update(updates)
+      .eq('id', id)
+
+    if (error) {
+      set({ error: error.message, loading: false })
+    } else {
+      set((state) => ({
+        lists: state.lists.map((list) =>
+          list.id === id ? { ...list, ...updates } : list
+        ),
+        currentList: state.currentList?.id === id
+          ? { ...state.currentList, ...updates }
+          : state.currentList,
+        loading: false,
+      }))
+    }
+  },
+
+  // Delete a list
+  deleteList: async (id: string) => {
+    set({ loading: true, error: null })
+    const { error } = await supabase
+      .from('lists')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      set({ error: error.message, loading: false })
+    } else {
+      set((state) => ({
+        lists: state.lists.filter((list) => list.id !== id),
+        currentList: state.currentList?.id === id ? null : state.currentList,
+        loading: false,
+      }))
+    }
+  },
+
+  setCurrentList: (list) => set({ currentList: list }),
+
+  // Fetch items for a list
+  fetchItems: async (listId: string) => {
+    set({ loading: true, error: null })
+    const { data, error } = await supabase
+      .from('list_items')
+      .select('*')
+      .eq('list_id', listId)
+      .order('position', { ascending: true })
+
+    if (error) {
+      set({ error: error.message, loading: false })
+    } else {
+      set({ items: data || [], loading: false })
+    }
+  },
+
+  // Create a new item
+  createItem: async (listId: string, content: string) => {
+    set({ loading: true, error: null })
+
+    // Get the max position
+    const { items } = get()
+    const maxPosition = items.length > 0
+      ? Math.max(...items.map(i => i.position)) + 1
+      : 0
+
+    const { data, error } = await supabase
+      .from('list_items')
+      .insert({ list_id: listId, content, position: maxPosition })
+      .select()
+      .single()
+
+    if (error) {
+      set({ error: error.message, loading: false })
+      return null
+    }
+
+    set((state) => ({
+      items: [...state.items, data],
+      loading: false
+    }))
+    return data
+  },
+
+  // Update an item
+  updateItem: async (id: string, updates) => {
+    set({ error: null })
+    const { error } = await supabase
+      .from('list_items')
+      .update(updates)
+      .eq('id', id)
+
+    if (error) {
+      set({ error: error.message })
+    } else {
+      set((state) => ({
+        items: state.items.map((item) =>
+          item.id === id ? { ...item, ...updates } : item
+        ),
+      }))
+    }
+  },
+
+  // Delete an item
+  deleteItem: async (id: string) => {
+    set({ error: null })
+    const { error } = await supabase
+      .from('list_items')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      set({ error: error.message })
+    } else {
+      set((state) => ({
+        items: state.items.filter((item) => item.id !== id),
+      }))
+    }
+  },
+
+  // Toggle item completion
+  toggleItemComplete: async (id: string) => {
+    const { items } = get()
+    const item = items.find((i) => i.id === id)
+    if (!item) return
+
+    await get().updateItem(id, { is_completed: !item.is_completed })
+  },
+
+  // Reorder items (for drag and drop)
+  reorderItems: async (newItems: ListItem[]) => {
+    set({ items: newItems })
+
+    // Update positions in database
+    const updates = newItems.map((item, index) => ({
+      id: item.id,
+      position: index,
+    }))
+
+    for (const update of updates) {
+      await supabase
+        .from('list_items')
+        .update({ position: update.position })
+        .eq('id', update.id)
+    }
+  },
+}))
