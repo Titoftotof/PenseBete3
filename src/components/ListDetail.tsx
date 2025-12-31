@@ -271,22 +271,21 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
             Complétés ({completedItems.length})
           </h3>
           {completedItems.map((item) => (
-            <GlassCard key={item.id} className="group opacity-60" hover={false}>
+            <GlassCard key={item.id} className="opacity-70" hover={false}>
               <GlassCardContent className="flex items-center gap-3 p-3">
-                <GripVertical className="h-4 w-4 text-muted-foreground opacity-0" />
                 <button
                   onClick={() => toggleItemComplete(item.id)}
-                  className="h-6 w-6 rounded-lg border-2 border-primary bg-primary flex items-center justify-center"
+                  className="h-6 w-6 rounded-lg border-2 border-green-500 bg-green-500 flex items-center justify-center shrink-0"
                   data-no-swipe="true"
                 >
-                  <Check className="h-3.5 w-3.5 text-primary-foreground" />
+                  <Check className="h-3.5 w-3.5 text-white" />
                 </button>
-                <span className="flex-1 line-through">{item.content}</span>
-                <div className="flex gap-1" data-no-swipe="true">
+                <span className="flex-1 line-through text-muted-foreground min-w-0 truncate">{item.content}</span>
+                <div className="flex gap-1 shrink-0" data-no-swipe="true">
                   <Button
                     variant="glass"
                     size="icon"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-blue-500"
+                    className="rounded-xl text-blue-500 h-8 w-8"
                     onClick={() => archiveItem(item.id)}
                     title="Archiver"
                   >
@@ -295,7 +294,7 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
                   <Button
                     variant="glass"
                     size="icon"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-red-500"
+                    className="rounded-xl text-red-500 h-8 w-8"
                     onClick={() => deleteItem(item.id)}
                     title="Supprimer"
                   >
@@ -322,15 +321,15 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
           {showArchived && (
             <div className="space-y-2">
               {archivedItems.map((item) => (
-                <GlassCard key={item.id} className="group opacity-40" hover={false}>
+                <GlassCard key={item.id} className="opacity-50" hover={false}>
                   <GlassCardContent className="flex items-center gap-3 p-3">
-                    <Archive className="h-4 w-4 text-muted-foreground" />
-                    <span className="flex-1 line-through text-sm">{item.content}</span>
-                    <div className="flex gap-1" data-no-swipe="true">
+                    <Archive className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="flex-1 line-through text-sm text-muted-foreground min-w-0 truncate">{item.content}</span>
+                    <div className="flex gap-1 shrink-0" data-no-swipe="true">
                       <Button
                         variant="glass"
                         size="icon"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-blue-500"
+                        className="rounded-xl text-blue-500 h-8 w-8"
                         onClick={() => unarchiveItem(item.id)}
                         title="Désarchiver"
                       >
@@ -339,7 +338,7 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
                       <Button
                         variant="glass"
                         size="icon"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-red-500"
+                        className="rounded-xl text-red-500 h-8 w-8"
                         onClick={() => deleteItem(item.id)}
                         title="Supprimer"
                       >

@@ -13,6 +13,7 @@ import { SearchBar } from '@/components/SearchBar'
 import { ShareDialog } from '@/components/ShareDialog'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { SwipeableItem } from '@/components/SwipeableItem'
+import { DraggableList } from '@/components/DraggableList'
 import type { List, ListCategory } from '@/types'
 
 const categories: { id: ListCategory; label: string; icon: React.ReactNode; color: string; gradient: string }[] = [
@@ -31,7 +32,7 @@ export default function DashboardPage() {
   const [showSidebar, setShowSidebar] = useState(false)
   const [sharingList, setSharingList] = useState<List | null>(null)
 
-  const { lists, fetchLists, deleteList, loading } = useListStore()
+  const { lists, fetchLists, deleteList, reorderLists, loading } = useListStore()
   const { folders } = useFolderStore()
   const { fetchSharedWithMe } = useShareStore()
 
@@ -170,10 +171,12 @@ export default function DashboardPage() {
           </div>
 
           {filteredLists.length > 0 ? (
-            <div className="grid gap-3">
-              {filteredLists.map((list) => (
+            <DraggableList
+              items={filteredLists}
+              onReorder={(newLists) => reorderLists(newLists)}
+              disabled={!!searchQuery}
+              renderItem={(list, dragHandle) => (
                 <SwipeableItem
-                  key={list.id}
                   onDelete={() => {
                     if (confirm('Supprimer cette liste ?')) {
                       deleteList(list.id)
@@ -181,12 +184,13 @@ export default function DashboardPage() {
                   }}
                 >
                   <GlassCard
-                    className="cursor-pointer group"
+                    className="cursor-pointer"
                     onClick={() => handleListClick(list)}
                     hover={false}
                   >
-                    <GlassCardContent className="flex items-center justify-between p-4">
-                      <div>
+                    <GlassCardContent className="flex items-center gap-3 p-4">
+                      {dragHandle}
+                      <div className="flex-1 min-w-0">
                         <h3 className="font-semibold">{list.name}</h3>
                         <p className="text-sm text-muted-foreground">
                           {getFolderName(list.folder_id) && (
@@ -198,11 +202,11 @@ export default function DashboardPage() {
                           Créée le {new Date(list.created_at).toLocaleDateString('fr-FR')}
                         </p>
                       </div>
-                      <div className="flex gap-1" data-no-swipe="true">
+                      <div className="flex gap-1 shrink-0" data-no-swipe="true">
                         <Button
                           variant="glass"
                           size="icon"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"
+                          className="rounded-xl"
                           onClick={(e) => handleShareList(e, list)}
                         >
                           <Share2 className="h-4 w-4" />
@@ -210,7 +214,7 @@ export default function DashboardPage() {
                         <Button
                           variant="glass"
                           size="icon"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-red-500"
+                          className="rounded-xl text-red-500"
                           onClick={(e) => handleDeleteList(e, list.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -219,8 +223,8 @@ export default function DashboardPage() {
                     </GlassCardContent>
                   </GlassCard>
                 </SwipeableItem>
-              ))}
-            </div>
+              )}
+            />
           ) : (
             <GlassCard className="border-dashed border-2" hover={false}>
               <GlassCardContent className="flex flex-col items-center justify-center py-12">
@@ -360,12 +364,14 @@ export default function DashboardPage() {
                 <span className="w-1 h-6 bg-gradient-to-b from-purple-500 to-pink-500 rounded-full"></span>
                 {searchQuery ? `Résultats pour "${searchQuery}"` : 'Listes récentes'}
               </h2>
-              <div className="grid gap-3">
-                {filteredLists.slice(0, searchQuery ? undefined : 10).map((list) => {
+              <DraggableList
+                items={filteredLists.slice(0, searchQuery ? undefined : 10)}
+                onReorder={(newLists) => reorderLists(newLists)}
+                disabled={!!searchQuery}
+                renderItem={(list, dragHandle) => {
                   const categoryInfo = categories.find((c) => c.id === list.category)!
                   return (
                     <SwipeableItem
-                      key={list.id}
                       onDelete={() => {
                         if (confirm('Supprimer cette liste ?')) {
                           deleteList(list.id)
@@ -373,12 +379,13 @@ export default function DashboardPage() {
                       }}
                     >
                       <GlassCard
-                        className="cursor-pointer group"
+                        className="cursor-pointer"
                         onClick={() => handleListClick(list)}
                         hover={false}
                       >
                         <GlassCardContent className="flex items-center gap-3 p-4">
-                          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${categoryInfo.gradient} flex items-center justify-center text-white shadow-md`}>
+                          {dragHandle}
+                          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${categoryInfo.gradient} flex items-center justify-center text-white shadow-md shrink-0`}>
                             {categoryInfo.icon}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -392,7 +399,7 @@ export default function DashboardPage() {
                             <Button
                               variant="glass"
                               size="icon"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"
+                              className="rounded-xl"
                               onClick={(e) => handleShareList(e, list)}
                             >
                               <Share2 className="h-4 w-4" />
@@ -400,7 +407,7 @@ export default function DashboardPage() {
                             <Button
                               variant="glass"
                               size="icon"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-red-500"
+                              className="rounded-xl text-red-500"
                               onClick={(e) => handleDeleteList(e, list.id)}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -410,8 +417,8 @@ export default function DashboardPage() {
                       </GlassCard>
                     </SwipeableItem>
                   )
-                })}
-              </div>
+                }}
+              />
             </div>
           ) : (
             <GlassCard className="border-dashed border-2" hover={false}>

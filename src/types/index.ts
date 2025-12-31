@@ -8,6 +8,7 @@ export interface List {
   name: string
   category: ListCategory
   folder_id?: string
+  position: number
   created_at: string
   updated_at: string
 }

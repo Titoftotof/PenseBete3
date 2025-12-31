@@ -13,8 +13,9 @@ interface ListStore {
   fetchLists: () => Promise<void>
   fetchListsByCategory: (category: ListCategory) => Promise<void>
   createList: (name: string, category: ListCategory) => Promise<List | null>
-  updateList: (id: string, updates: Partial<Pick<List, 'name' | 'category' | 'folder_id'>>) => Promise<void>
+  updateList: (id: string, updates: Partial<Pick<List, 'name' | 'category' | 'folder_id' | 'position'>>) => Promise<void>
   deleteList: (id: string) => Promise<void>
+  reorderLists: (lists: List[]) => Promise<void>
   setCurrentList: (list: List | null) => void
 
   // Items
@@ -41,7 +42,7 @@ export const useListStore = create<ListStore>((set, get) => ({
     const { data, error } = await supabase
       .from('lists')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('position', { ascending: true })
 
     if (error) {
       set({ error: error.message, loading: false })
@@ -76,9 +77,13 @@ export const useListStore = create<ListStore>((set, get) => ({
       return null
     }
 
+    // Get the max position
+    const { lists } = get()
+    const maxPosition = lists.length > 0 ? Math.max(...lists.map(l => l.position)) + 1 : 0
+
     const { data, error } = await supabase
       .from('lists')
-      .insert({ name, category, user_id: user.id })
+      .insert({ name, category, user_id: user.id, position: maxPosition })
       .select()
       .single()
 
@@ -88,7 +93,7 @@ export const useListStore = create<ListStore>((set, get) => ({
     }
 
     set((state) => ({
-      lists: [data, ...state.lists],
+      lists: [...state.lists, data],
       loading: false
     }))
     return data
@@ -137,6 +142,24 @@ export const useListStore = create<ListStore>((set, get) => ({
   },
 
   setCurrentList: (list) => set({ currentList: list }),
+
+  // Reorder lists (for drag and drop)
+  reorderLists: async (newLists: List[]) => {
+    set({ lists: newLists })
+
+    // Update positions in database
+    const updates = newLists.map((list, index) => ({
+      id: list.id,
+      position: index,
+    }))
+
+    for (const update of updates) {
+      await supabase
+        .from('lists')
+        .update({ position: update.position })
+        .eq('id', update.id)
+    }
+  },
 
   // Fetch items for a list
   fetchItems: async (listId: string) => {

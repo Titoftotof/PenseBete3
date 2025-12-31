@@ -35,17 +35,22 @@ export function SwipeableItem({
     startX.current = clientX
     currentX.current = clientX
     setIsDragging(true)
-    isSwipeActive.current = true
+    isSwipeActive.current = false // Don't activate swipe immediately
   }, [disabled])
 
   const handleMove = useCallback((clientX: number) => {
-    if (!isDragging || disabled || !isSwipeActive.current) return
+    if (!isDragging || disabled) return
 
     const diff = clientX - startX.current
     currentX.current = clientX
 
-    // Only allow horizontal swipe (detect if it's a drag or swipe)
-    if (Math.abs(diff) > 10) {
+    // Only activate swipe if movement is significant (> 20px)
+    if (Math.abs(diff) > 20 && !isSwipeActive.current) {
+      isSwipeActive.current = true
+    }
+
+    // Only update UI if swipe is active
+    if (isSwipeActive.current) {
       setTranslateX(diff)
 
       // Show backgrounds based on direction
@@ -67,11 +72,13 @@ export function SwipeableItem({
 
     const diff = currentX.current - startX.current
 
-    // Trigger actions
-    if (diff < -SWIPE_THRESHOLD && onDelete) {
-      onDelete()
-    } else if (diff > SWIPE_THRESHOLD && onComplete) {
-      onComplete()
+    // Only trigger actions if swipe was actually activated (movement > 20px)
+    if (isSwipeActive.current) {
+      if (diff < -SWIPE_THRESHOLD && onDelete) {
+        onDelete()
+      } else if (diff > SWIPE_THRESHOLD && onComplete) {
+        onComplete()
+      }
     }
 
     // Reset
@@ -84,6 +91,10 @@ export function SwipeableItem({
 
   // Touch handlers
   const handleTouchStart = useCallback((e: TouchEvent) => {
+    // Don't start swipe if touching drag handle or other no-swipe elements
+    if ((e.target as HTMLElement).closest('[data-no-swipe]')) {
+      return
+    }
     const touch = e.touches[0]
     handleStart(touch.clientX)
   }, [handleStart])
