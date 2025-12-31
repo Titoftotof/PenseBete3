@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { LogOut, Sun, Moon, Monitor, ClipboardList, WifiOff, RotateCw } from 'lucide-react'
+import { LogOut, Sun, Moon, Monitor, ClipboardList, WifiOff, RotateCw, Calendar } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { useSyncStore } from '@/stores/syncStore'
+import { useLocation } from 'react-router-dom'
 
 export function Header() {
   const [logoutLoading, setLogoutLoading] = useState(false)
   const { theme, toggleTheme } = useTheme()
   const isOnline = useOnlineStatus()
   const { pendingOperations, isSyncing, setOnlineStatus } = useSyncStore()
+  const location = useLocation()
 
   // Sync online status with store
   useEffect(() => {
@@ -63,6 +66,18 @@ export function Header() {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {location.pathname === '/' && (
+            <Link to="/calendar">
+              <Button
+                variant="glass"
+                size="icon"
+                title="Calendrier"
+                className="rounded-xl"
+              >
+                <Calendar className="h-5 w-5" />
+              </Button>
+            </Link>
+          )}
           <Button
             variant="glass"
             size="icon"

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { notificationService, type Reminder } from '@/lib/notifications'
+import { notificationService } from '@/lib/notifications'
 
 export function useNotifications() {
   const [permission, setPermission] = useState<NotificationPermission>('default')
@@ -14,19 +14,9 @@ export function useNotifications() {
 
     init()
 
-    // Check reminders every minute
-    const interval = setInterval(() => {
-      notificationService.checkReminders()
-    }, 60000)
-
-    // Cleanup old reminders daily
-    const cleanupInterval = setInterval(() => {
-      notificationService.cleanupReminders()
-    }, 86400000)
-
     return () => {
-      clearInterval(interval)
-      clearInterval(cleanupInterval)
+      // Cleanup on unmount
+      notificationService.destroy()
     }
   }, [])
 
@@ -41,25 +31,10 @@ export function useNotifications() {
     notificationService.sendNotification(title, body, data)
   }
 
-  const saveReminder = (reminder: Reminder) => {
-    notificationService.saveReminder(reminder)
-  }
-
-  const removeReminder = (itemId: string) => {
-    notificationService.removeReminder(itemId)
-  }
-
-  const getReminders = () => {
-    return notificationService.getReminders()
-  }
-
   return {
     permission,
     isEnabled,
     requestPermission,
-    sendNotification,
-    saveReminder,
-    removeReminder,
-    getReminders
+    sendNotification
   }
 }

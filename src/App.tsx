@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
+import CalendarPage from '@/pages/CalendarPage'
 
 function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -44,6 +45,10 @@ function App() {
         <Route
           path="/"
           element={session ? <DashboardPage /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/calendar"
+          element={session ? <CalendarPage /> : <Navigate to="/login" replace />}
         />
       </Routes>
     </BrowserRouter>

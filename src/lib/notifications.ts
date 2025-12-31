@@ -1,17 +1,10 @@
-export interface Reminder {
-  id: string
-  itemId: string
-  listId: string
-  itemName: string
-  listName: string
-  dueDate: string
-}
+import { supabase } from './supabase'
 
 const NOTIFICATIONS_ENABLED_KEY = 'pensebete-notifications-enabled'
-const REMINDERS_STORAGE_KEY = 'pensebete-reminders'
 
 class NotificationService {
   private permission: NotificationPermission = 'default'
+  private checkInterval: number | null = null
 
   async init() {
     if (!('Notification' in window)) {
@@ -24,6 +17,9 @@ class NotificationService {
     if (savedPermission === 'granted') {
       this.permission = 'granted'
     }
+
+    // Start checking for reminders periodically
+    this.startReminderCheck()
 
     return this.permission === 'granted'
   }
@@ -80,79 +76,158 @@ class NotificationService {
     }
   }
 
-  saveReminder(reminder: Reminder) {
-    const reminders = this.getReminders()
-    reminders.push(reminder)
-    localStorage.setItem(REMINDERS_STORAGE_KEY, JSON.stringify(reminders))
+  /**
+   * Start periodic check for reminders (every minute)
+   */
+  private startReminderCheck() {
+    if (this.checkInterval) return
+
+    this.checkReminders() // Initial check
+    this.checkInterval = window.setInterval(() => {
+      this.checkReminders()
+    }, 60000) // Check every minute
   }
 
-  removeReminder(itemId: string) {
-    const reminders = this.getReminders()
-    const filtered = reminders.filter(r => r.itemId !== itemId)
-    localStorage.setItem(REMINDERS_STORAGE_KEY, JSON.stringify(filtered))
+  /**
+   * Stop periodic check for reminders
+   */
+  private stopReminderCheck() {
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval)
+      this.checkInterval = null
+    }
   }
 
-  getReminders(): Reminder[] {
-    const stored = localStorage.getItem(REMINDERS_STORAGE_KEY)
-    return stored ? JSON.parse(stored) : []
-  }
-
-  clearReminders() {
-    localStorage.removeItem(REMINDERS_STORAGE_KEY)
-  }
-
-  // Check for due reminders (should be called periodically)
-  checkReminders() {
+  /**
+   * Check for due reminders from Supabase
+   */
+  async checkReminders() {
     if (!this.isEnabled()) return
 
-    const reminders = this.getReminders()
-    const now = new Date()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const now = new Date().toISOString()
+    const oneHourFromNow = new Date(Date.now() + 3600000).toISOString()
+
+    // Fetch reminders that are due within the next hour and not yet sent
+    const { data: reminders } = await supabase
+      .from('reminders')
+      .select(`
+        *,
+        list_items (
+          content,
+          lists (
+            name
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('is_sent', false)
+      .gte('reminder_time', now)
+      .lte('reminder_time', oneHourFromNow)
+
+    if (!reminders) return
+
+    // Get notified reminder IDs from localStorage
     const notifiedKey = 'pensebete-notified-reminders'
     const notified = JSON.parse(localStorage.getItem(notifiedKey) || '[]')
 
-    reminders.forEach(reminder => {
-      const dueDate = new Date(reminder.dueDate)
-      const timeDiff = dueDate.getTime() - now.getTime()
+    for (const reminder of reminders as any[]) {
+      const reminderId = reminder.id
+      const itemName = reminder.list_items?.content || 'Élément'
+      const listName = reminder.list_items?.lists?.name || 'Liste'
 
-      // Notify if due date is within 1 hour and not already notified
-      if (timeDiff <= 3600000 && timeDiff > 0 && !notified.includes(reminder.id)) {
+      // Check if already notified
+      if (notified.includes(reminderId)) continue
+
+      // Calculate time until reminder
+      const reminderTime = new Date(reminder.reminder_time)
+      const timeDiff = reminderTime.getTime() - Date.now()
+
+      // Send notification
+      if (timeDiff <= 60000) {
+        // Due within 1 minute - send now
         this.sendNotification(
-          `Rappel: ${reminder.itemName}`,
-          `Élément "${reminder.itemName}" de la liste "${reminder.listName}" à échéance dans ${Math.ceil(timeDiff / 60000)} minutes`,
-          { itemId: reminder.itemId, listId: reminder.listId }
+          `Rappel: ${itemName}`,
+          `Élément "${itemName}" de la liste "${listName}" est à échéance maintenant !`,
+          { itemId: reminder.item_id }
         )
-
-        // Mark as notified
-        notified.push(reminder.id)
-        localStorage.setItem(notifiedKey, JSON.stringify(notified))
+      } else {
+        // Due within the hour
+        this.sendNotification(
+          `Rappel: ${itemName}`,
+          `Élément "${itemName}" de la liste "${listName}" à échéance dans ${Math.ceil(timeDiff / 60000)} minutes`,
+          { itemId: reminder.item_id }
+        )
       }
 
-      // Also notify if overdue
-      if (timeDiff < 0 && Math.abs(timeDiff) < 86400000 && !notified.includes(`${reminder.id}-overdue`)) {
+      // Mark as notified locally
+      notified.push(reminderId)
+      localStorage.setItem(notifiedKey, JSON.stringify(notified))
+
+      // Mark as sent in database
+      await supabase
+        .from('reminders')
+        .update({ is_sent: true })
+        .eq('id', reminderId)
+    }
+
+    // Also check for overdue reminders
+    const { data: overdueReminders } = await supabase
+      .from('reminders')
+      .select(`
+        *,
+        list_items (
+          content,
+          lists (
+            name
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('is_sent', false)
+      .lt('reminder_time', now)
+
+    if (overdueReminders) {
+      for (const reminder of overdueReminders as any[]) {
+        const overdueKey = `${reminder.id}-overdue`
+        if (notified.includes(overdueKey)) continue
+
+        const itemName = reminder.list_items?.content || 'Élément'
+        const listName = reminder.list_items?.lists?.name || 'Liste'
+
         this.sendNotification(
-          `Échéance dépassée: ${reminder.itemName}`,
-          `L'élément "${reminder.itemName}" de la liste "${reminder.listName}" est en retard !`,
-          { itemId: reminder.itemId, listId: reminder.listId }
+          `Échéance dépassée: ${itemName}`,
+          `L'élément "${itemName}" de la liste "${listName}" est en retard !`,
+          { itemId: reminder.item_id }
         )
 
-        notified.push(`${reminder.id}-overdue`)
+        notified.push(overdueKey)
         localStorage.setItem(notifiedKey, JSON.stringify(notified))
       }
-    })
+    }
   }
 
-  // Clean up old reminders
-  cleanupReminders() {
-    const reminders = this.getReminders()
-    const now = new Date()
-    const oneDayAgo = now.getTime() - 86400000
+  /**
+   * Clean up old notified reminders from localStorage
+   */
+  cleanupNotifiedReminders() {
+    const notifiedKey = 'pensebete-notified-reminders'
+    const notified = JSON.parse(localStorage.getItem(notifiedKey) || '[]')
 
-    const filtered = reminders.filter(r => {
-      const dueDate = new Date(r.dueDate).getTime()
-      return dueDate > oneDayAgo
-    })
+    // Note: We can't easily filter by time without storing timestamps
+    // For now, just limit the array size
+    if (notified.length > 100) {
+      localStorage.setItem(notifiedKey, JSON.stringify(notified.slice(-50)))
+    }
+  }
 
-    localStorage.setItem(REMINDERS_STORAGE_KEY, JSON.stringify(filtered))
+  /**
+   * Destroy the notification service
+   */
+  destroy() {
+    this.stopReminderCheck()
   }
 }
 

@@ -21,7 +21,7 @@ interface ListStore {
   // Items
   fetchItems: (listId: string) => Promise<void>
   createItem: (listId: string, content: string) => Promise<ListItem | null>
-  updateItem: (id: string, updates: Partial<Pick<ListItem, 'content' | 'is_completed' | 'is_archived' | 'position' | 'priority' | 'due_date'>>) => Promise<void>
+  updateItem: (id: string, updates: Partial<Pick<ListItem, 'content' | 'is_completed' | 'is_archived' | 'position' | 'priority' | 'due_date' | 'grocery_category'>>) => Promise<void>
   deleteItem: (id: string) => Promise<void>
   toggleItemComplete: (id: string) => Promise<void>
   archiveItem: (id: string) => Promise<void>

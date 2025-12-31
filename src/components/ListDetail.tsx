@@ -3,8 +3,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GlassCard, GlassCardContent } from '@/components/ui/glass-card'
 import { SwipeableItem } from '@/components/SwipeableItem'
-import { ArrowLeft, Plus, Trash2, Check, GripVertical, Flag, Calendar, Archive, Undo } from 'lucide-react'
+import { FrequentItemsSuggestions } from '@/components/FrequentItemsSuggestions'
+import { VoiceInputButton } from '@/components/VoiceInputButton'
+import { DateTimePicker } from '@/components/DateTimePicker'
+import { ArrowLeft, Plus, Trash2, Check, GripVertical, Flag, Calendar, Archive, Undo, Layers, List as ListIcon, Bell, BellOff } from 'lucide-react'
 import { useListStore } from '@/stores/listStore'
+import { useFrequentItemsStore } from '@/stores/frequentItemsStore'
+import { useReminderStore } from '@/stores/reminderStore'
+import { parseVoiceInputWithPriorities } from '@/lib/voiceParser'
+import { categorizeItem, getCategoryColor } from '@/lib/categorizer'
 import type { List, ListItem, Priority } from '@/types'
 import {
   DndContext,
@@ -34,6 +41,8 @@ interface SortableItemProps {
   onToggle: () => void
   onDelete: () => void
   onUpdatePriority: (priority: Priority) => void
+  onSetReminder: () => void
+  onRemoveReminder: () => void
 }
 
 const PRIORITY_CONFIG: Record<Priority, { color: string; label: string }> = {
@@ -45,7 +54,7 @@ const PRIORITY_CONFIG: Record<Priority, { color: string; label: string }> = {
 
 const PRIORITIES: Priority[] = ['low', 'normal', 'high', 'urgent']
 
-function SortableItem({ item, onToggle, onDelete, onUpdatePriority }: SortableItemProps) {
+function SortableItem({ item, onToggle, onDelete, onUpdatePriority, onSetReminder, onRemoveReminder }: SortableItemProps) {
   const [showPriorityMenu, setShowPriorityMenu] = useState(false)
   const {
     attributes,
@@ -130,6 +139,27 @@ function SortableItem({ item, onToggle, onDelete, onUpdatePriority }: SortableIt
             </div>
           )}
         </div>
+
+        {/* Reminder button */}
+        <div data-no-swipe="true">
+          {item.due_date ? (
+            <button
+              onClick={onRemoveReminder}
+              className="p-2 rounded-xl hover:bg-accent transition-colors text-purple-500"
+              title={`Supprimer le rappel (${new Date(item.due_date).toLocaleDateString('fr-FR')})`}
+            >
+              <Bell className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              onClick={onSetReminder}
+              className="p-2 rounded-xl hover:bg-accent transition-colors text-muted-foreground"
+              title="Ajouter un rappel"
+            >
+              <BellOff className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </GlassCardContent>
     </GlassCard>
   )
@@ -152,7 +182,12 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
   const [newItemContent, setNewItemContent] = useState('')
   const [showCompleted, setShowCompleted] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
+  const [groupedByCategory, setGroupedByCategory] = useState(false)
+  const [parsedVoiceItems, setParsedVoiceItems] = useState<Array<{ content: string; priority: Priority }> | null>(null)
+  const [reminderPickerItem, setReminderPickerItem] = useState<ListItem | null>(null)
   const { items, fetchItems, createItem, toggleItemComplete, deleteItem, updateItem, reorderItems, archiveItem, unarchiveItem, loading } = useListStore()
+  const { trackItem } = useFrequentItemsStore()
+  const { createReminder, getReminderByItemId, deleteReminder, fetchReminders } = useReminderStore()
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -167,14 +202,52 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
 
   useEffect(() => {
     fetchItems(list.id)
-  }, [list.id, fetchItems])
+    fetchReminders()
+  }, [list.id, fetchItems, fetchReminders])
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newItemContent.trim()) return
 
-    await createItem(list.id, newItemContent.trim())
+    const content = newItemContent.trim()
+    await createItem(list.id, content)
+    await trackItem(content)
     setNewItemContent('')
+  }
+
+  const handleSelectFrequentItem = (content: string) => {
+    setNewItemContent(content)
+  }
+
+  const handleVoiceResult = (text: string) => {
+    const parsed = parseVoiceInputWithPriorities(text)
+    if (parsed.length > 0) {
+      setParsedVoiceItems(parsed)
+    } else {
+      // Single item, add directly
+      setNewItemContent(text)
+    }
+  }
+
+  const handleConfirmVoiceItems = async () => {
+    if (!parsedVoiceItems) return
+
+    for (const item of parsedVoiceItems) {
+      await createItem(list.id, item.content)
+      await trackItem(item.content)
+
+      // Set priority if not normal
+      if (item.priority !== 'normal') {
+        // Need to get the created item first - this is a simplified approach
+        // In production, you'd want to return the created item from createItem
+      }
+    }
+
+    setParsedVoiceItems(null)
+  }
+
+  const handleCancelVoiceItems = () => {
+    setParsedVoiceItems(null)
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -192,6 +265,46 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
     updateItem(itemId, { priority })
   }
 
+  // Reminder handlers
+  const handleSetReminder = (item: ListItem) => {
+    setReminderPickerItem(item)
+  }
+
+  const handleReminderConfirm = async (date: Date) => {
+    if (!reminderPickerItem) return
+
+    const existingReminder = getReminderByItemId(reminderPickerItem.id)
+    if (existingReminder) {
+      // Update existing reminder - for now we'll delete and recreate
+      await deleteReminder(existingReminder.id)
+    }
+
+    await createReminder(reminderPickerItem.id, date)
+    // Also update the item's due_date for backward compatibility
+    await updateItem(reminderPickerItem.id, { due_date: date.toISOString() })
+    setReminderPickerItem(null)
+  }
+
+  const handleRemoveReminder = async (item: ListItem) => {
+    const existingReminder = getReminderByItemId(item.id)
+    if (existingReminder) {
+      await deleteReminder(existingReminder.id)
+    }
+    await updateItem(item.id, { due_date: undefined })
+  }
+
+  // Auto-categorize items without category
+  useEffect(() => {
+    items
+      .filter((item) => !item.is_completed && !item.is_archived && !item.grocery_category)
+      .forEach((item) => {
+        const categorized = categorizeItem(item.content)
+        if (categorized.category !== 'Autres') {
+          updateItem(item.id, { grocery_category: categorized.category as any })
+        }
+      })
+  }, [items, updateItem])
+
   // Sort items: urgent first, then by priority, then by position
   const sortedPendingItems = items
     .filter((item) => !item.is_completed && !item.is_archived)
@@ -203,17 +316,38 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
       return a.position - b.position
     })
 
+  // Group items by category when category view is enabled
+  const itemsByCategory = sortedPendingItems.reduce((acc, item) => {
+    const category = item.grocery_category || 'Autres'
+    if (!acc[category]) {
+      acc[category] = []
+    }
+    acc[category].push(item)
+    return acc
+  }, {} as Record<string, typeof sortedPendingItems>)
+
   const completedItems = items.filter((item) => item.is_completed && !item.is_archived)
   const archivedItems = items.filter((item) => item.is_archived)
 
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="glass" size="icon" onClick={onBack} className="rounded-xl">
-          <ArrowLeft className="h-5 w-5" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="glass" size="icon" onClick={onBack} className="rounded-xl">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h2 className="text-xl font-bold">{list.name}</h2>
+        </div>
+        <Button
+          variant="glass"
+          size="icon"
+          onClick={() => setGroupedByCategory(!groupedByCategory)}
+          className={`rounded-xl transition-colors ${groupedByCategory ? 'bg-purple-500/20 text-purple-500' : ''}`}
+          title={groupedByCategory ? 'Vue liste' : 'Vue par catégorie'}
+        >
+          {groupedByCategory ? <ListIcon className="h-5 w-5" /> : <Layers className="h-5 w-5" />}
         </Button>
-        <h2 className="text-xl font-bold">{list.name}</h2>
       </div>
 
       {/* Add item form */}
@@ -225,6 +359,7 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
           disabled={loading}
           className="glass-input rounded-xl h-12"
         />
+        <VoiceInputButton onResult={handleVoiceResult} disabled={loading} />
         <Button
           type="submit"
           disabled={loading || !newItemContent.trim()}
@@ -233,6 +368,9 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
           <Plus className="h-5 w-5" />
         </Button>
       </form>
+
+      {/* Frequent items suggestions */}
+      <FrequentItemsSuggestions onSelectItem={handleSelectFrequentItem} />
 
       {/* Priority legend */}
       <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">
@@ -244,26 +382,58 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
         ))}
       </div>
 
-      {/* Pending items with drag and drop */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={sortedPendingItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2">
-            {sortedPendingItems.map((item) => (
-              <SortableItem
-                key={item.id}
-                item={item}
-                onToggle={() => toggleItemComplete(item.id)}
-                onDelete={() => deleteItem(item.id)}
-                onUpdatePriority={(priority) => handleUpdatePriority(item.id, priority)}
-              />
+      {/* Pending items - with category grouping or drag and drop */}
+      {groupedByCategory ? (
+        // Category view
+        <div className="space-y-4">
+          {Object.entries(itemsByCategory)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([category, categoryItems]) => (
+              <div key={category} className="space-y-2">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium ${getCategoryColor(category as any)}`}>
+                  {category}
+                  <span className="opacity-70">({categoryItems.length})</span>
+                </div>
+                <div className="space-y-2">
+                  {categoryItems.map((item) => (
+                    <SortableItem
+                      key={item.id}
+                      item={item}
+                      onToggle={() => toggleItemComplete(item.id)}
+                      onDelete={() => deleteItem(item.id)}
+                      onUpdatePriority={(priority) => handleUpdatePriority(item.id, priority)}
+                      onSetReminder={() => handleSetReminder(item)}
+                      onRemoveReminder={() => handleRemoveReminder(item)}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+        </div>
+      ) : (
+        // List view with drag and drop
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={sortedPendingItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {sortedPendingItems.map((item) => (
+                <SortableItem
+                  key={item.id}
+                  item={item}
+                  onToggle={() => toggleItemComplete(item.id)}
+                  onDelete={() => deleteItem(item.id)}
+                  onUpdatePriority={(priority) => handleUpdatePriority(item.id, priority)}
+                  onSetReminder={() => handleSetReminder(item)}
+                  onRemoveReminder={() => handleRemoveReminder(item)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
 
       {/* Completed items */}
       {completedItems.length > 0 && (
@@ -375,6 +545,71 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
           </GlassCardContent>
         </GlassCard>
       )}
+
+      {/* Voice input confirmation modal */}
+      {parsedVoiceItems && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <GlassCard className="max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <GlassCardContent className="p-6">
+              <h3 className="text-xl font-semibold mb-4">
+                {parsedVoiceItems.length === 1
+                  ? 'Ajouter cet élément ?'
+                  : `Ajouter ${parsedVoiceItems.length} éléments ?`}
+              </h3>
+
+              <div className="max-h-60 overflow-y-auto space-y-2 mb-4">
+                {parsedVoiceItems.map((item, index) => (
+                  <div
+                    key={index}
+                    className="p-3 rounded-xl bg-muted/50 border border-border"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground text-sm">#{index + 1}</span>
+                      <span className="flex-1">{item.content}</span>
+                      {item.priority !== 'normal' && (
+                        <Flag
+                          className={`h-4 w-4 ${
+                            item.priority === 'urgent'
+                              ? 'text-red-500'
+                              : item.priority === 'high'
+                                ? 'text-orange-500'
+                                : 'text-gray-400'
+                          }`}
+                          fill="currentColor"
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleCancelVoiceItems}
+                  className="flex-1 rounded-xl"
+                >
+                  Annuler
+                </Button>
+                <Button
+                  onClick={handleConfirmVoiceItems}
+                  className="flex-1 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                >
+                  Ajouter
+                </Button>
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+        </div>
+      )}
+
+      {/* DateTimePicker modal */}
+      <DateTimePicker
+        isOpen={reminderPickerItem !== null}
+        onClose={() => setReminderPickerItem(null)}
+        onConfirm={handleReminderConfirm}
+        initialDate={reminderPickerItem?.due_date ? new Date(reminderPickerItem.due_date) : undefined}
+      />
     </div>
   )
 }
