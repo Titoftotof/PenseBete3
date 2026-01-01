@@ -301,23 +301,23 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
     if (existingReminder) {
       await deleteReminder(existingReminder.id)
     }
-    await updateItem(item.id, { due_date: undefined })
+    await updateItem(item.id, { due_date: null })
   }
 
-  // Auto-categorize items without category
-  useEffect(() => {
-    items
-      .filter((item) => !item.is_completed && !item.is_archived && !item.grocery_category)
-      .forEach((item) => {
-        const categorized = categorizeItem(item.content)
-        if (categorized.category !== 'Autres') {
-          updateItem(item.id, { grocery_category: categorized.category as any })
-        }
-      })
-  }, [items, updateItem])
+  // Auto-categorize items without category (local only, not saved to DB)
+  // Note: grocery_category column needs to be added to Supabase before enabling DB persistence
+  const categorizedItems = items.map((item) => {
+    if (!item.is_completed && !item.is_archived && !item.grocery_category) {
+      const categorized = categorizeItem(item.content)
+      if (categorized.category !== 'Autres') {
+        return { ...item, grocery_category: categorized.category as any }
+      }
+    }
+    return item
+  })
 
   // Sort items: urgent first, then by priority, then by position
-  const sortedPendingItems = items
+  const sortedPendingItems = categorizedItems
     .filter((item) => !item.is_completed && !item.is_archived)
     .sort((a, b) => {
       const priorityOrder = { urgent: 0, high: 1, normal: 2, low: 3 }
@@ -337,8 +337,8 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
     return acc
   }, {} as Record<string, typeof sortedPendingItems>)
 
-  const completedItems = items.filter((item) => item.is_completed && !item.is_archived)
-  const archivedItems = items.filter((item) => item.is_archived)
+  const completedItems = categorizedItems.filter((item) => item.is_completed && !item.is_archived)
+  const archivedItems = categorizedItems.filter((item) => item.is_archived)
 
   return (
     <div className="space-y-4">

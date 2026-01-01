@@ -32,7 +32,7 @@ export interface ListItem {
   is_archived: boolean
   position: number
   priority: Priority
-  due_date?: string
+  due_date?: string | null
   grocery_category?: GroceryCategory
   created_at: string
   updated_at: string
