@@ -161,10 +161,30 @@ class NotificationService {
         icon: '/icon.svg',
         badge: '/icon.svg',
         tag: data?.itemId || 'default',
-        requireInteraction: true // Keep notification visible until user interacts
+        requireInteraction: true, // Keep notification visible until user interacts
+        silent: false // Make sure it's not silent
       })
 
-      console.log('[Notifications] Notification created successfully')
+      console.log('[Notifications] Notification created successfully', notification)
+
+      // Also play a sound as backup
+      try {
+        const audio = new Audio('/notification.mp3')
+        audio.volume = 0.5
+        audio.play().catch(() => {
+          // Ignore audio errors (file might not exist)
+        })
+      } catch {
+        // Ignore audio errors
+      }
+
+      notification.onshow = () => {
+        console.log('[Notifications] Notification shown')
+      }
+
+      notification.onerror = (e) => {
+        console.error('[Notifications] Notification error:', e)
+      }
 
       notification.onclick = () => {
         console.log('[Notifications] Notification clicked')
@@ -173,6 +193,8 @@ class NotificationService {
       }
     } catch (error) {
       console.error('[Notifications] Error creating notification:', error)
+      // Fallback: show an alert if notification fails
+      alert(`${title}\n\n${body}`)
     }
   }
 
