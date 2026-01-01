@@ -141,38 +141,55 @@ class NotificationService {
   }
 
   sendNotification(title: string, body: string, data?: any) {
-    if (!this.isEnabled()) return
+    console.log('[Notifications] sendNotification called:', { title, body, isEnabled: this.isEnabled() })
+
+    if (!this.isEnabled()) {
+      console.log('[Notifications] Notifications not enabled, not sending')
+      return
+    }
 
     // Check if we're in a browser context
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') {
+      console.log('[Notifications] Not in browser context')
+      return
+    }
 
-    // Use Service Worker if available, otherwise fallback to regular Notification
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'SHOW_NOTIFICATION',
-        data: { title, body, data }
-      })
-    } else {
-      new Notification(title, {
+    try {
+      // Always use regular Notification API directly
+      const notification = new Notification(title, {
         body,
         icon: '/icon.svg',
         badge: '/icon.svg',
         tag: data?.itemId || 'default',
-        data
-      } as NotificationOptions)
+        requireInteraction: true // Keep notification visible until user interacts
+      })
+
+      console.log('[Notifications] Notification created successfully')
+
+      notification.onclick = () => {
+        console.log('[Notifications] Notification clicked')
+        window.focus()
+        notification.close()
+      }
+    } catch (error) {
+      console.error('[Notifications] Error creating notification:', error)
     }
   }
 
   /**
-   * Start periodic check for reminders (every minute)
+   * Start periodic check for reminders (every 30 seconds)
    */
   private startReminderCheck() {
-    if (this.checkInterval) return
+    if (this.checkInterval) {
+      console.log('[Notifications] Reminder check already running')
+      return
+    }
 
+    console.log('[Notifications] Starting reminder check interval')
     this.checkReminders() // Initial check
     this.checkInterval = window.setInterval(() => {
       this.checkReminders()
-    }, 60000) // Check every minute
+    }, 30000) // Check every 30 seconds for better responsiveness
   }
 
   /**
@@ -189,16 +206,28 @@ class NotificationService {
    * Check for due reminders from Supabase
    */
   async checkReminders() {
-    if (!this.isEnabled()) return
+    console.log('[Notifications] Checking reminders...', { isEnabled: this.isEnabled() })
+
+    if (!this.isEnabled()) {
+      console.log('[Notifications] Notifications not enabled, skipping check')
+      return
+    }
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      console.log('[Notifications] No user logged in, skipping check')
+      return
+    }
 
-    const now = new Date().toISOString()
-    const oneHourFromNow = new Date(Date.now() + 3600000).toISOString()
+    // Check for reminders that are due now or in the past (not yet sent)
+    // We look for reminders from 1 hour ago to 5 minutes in the future
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString()
+    const fiveMinutesFromNow = new Date(Date.now() + 300000).toISOString()
 
-    // Fetch reminders that are due within the next hour and not yet sent
-    const { data: reminders } = await supabase
+    console.log('[Notifications] Fetching reminders between', oneHourAgo, 'and', fiveMinutesFromNow)
+
+    // Fetch reminders that are due (past or within 5 minutes) and not yet sent
+    const { data: reminders, error } = await supabase
       .from('reminders')
       .select(`
         *,
@@ -211,10 +240,17 @@ class NotificationService {
       `)
       .eq('user_id', user.id)
       .eq('is_sent', false)
-      .gte('reminder_time', now)
-      .lte('reminder_time', oneHourFromNow)
+      .gte('reminder_time', oneHourAgo)
+      .lte('reminder_time', fiveMinutesFromNow)
 
-    if (!reminders) return
+    if (error) {
+      console.error('[Notifications] Error fetching reminders:', error)
+      return
+    }
+
+    console.log('[Notifications] Found reminders:', reminders?.length || 0, reminders)
+
+    if (!reminders || reminders.length === 0) return
 
     // Get notified reminder IDs from localStorage
     const notifiedKey = 'pensebete-notified-reminders'
@@ -226,74 +262,52 @@ class NotificationService {
       const listName = reminder.list_items?.lists?.name || 'Liste'
 
       // Check if already notified
-      if (notified.includes(reminderId)) continue
+      if (notified.includes(reminderId)) {
+        console.log('[Notifications] Reminder already notified:', reminderId)
+        continue
+      }
 
-      // Calculate time until reminder
+      // Calculate time until/since reminder
       const reminderTime = new Date(reminder.reminder_time)
       const timeDiff = reminderTime.getTime() - Date.now()
 
-      // Send notification
-      if (timeDiff <= 60000) {
-        // Due within 1 minute - send now
-        this.sendNotification(
-          `Rappel: ${itemName}`,
-          `Élément "${itemName}" de la liste "${listName}" est à échéance maintenant !`,
-          { itemId: reminder.item_id }
-        )
-      } else {
-        // Due within the hour
-        this.sendNotification(
-          `Rappel: ${itemName}`,
-          `Élément "${itemName}" de la liste "${listName}" à échéance dans ${Math.ceil(timeDiff / 60000)} minutes`,
-          { itemId: reminder.item_id }
-        )
-      }
+      console.log('[Notifications] Processing reminder:', {
+        id: reminderId,
+        itemName,
+        reminderTime: reminder.reminder_time,
+        timeDiff,
+        isOverdue: timeDiff < 0
+      })
 
-      // Mark as notified locally
-      notified.push(reminderId)
-      localStorage.setItem(notifiedKey, JSON.stringify(notified))
+      // Send notification for due or overdue reminders
+      if (timeDiff <= 60000) { // Due within 1 minute or overdue
+        const message = timeDiff < -60000
+          ? `Rappel en retard pour "${itemName}" !`
+          : `Rappel: "${itemName}" - c'est maintenant !`
 
-      // Mark as sent in database
-      await supabase
-        .from('reminders')
-        .update({ is_sent: true })
-        .eq('id', reminderId)
-    }
-
-    // Also check for overdue reminders
-    const { data: overdueReminders } = await supabase
-      .from('reminders')
-      .select(`
-        *,
-        list_items (
-          content,
-          lists (
-            name
-          )
-        )
-      `)
-      .eq('user_id', user.id)
-      .eq('is_sent', false)
-      .lt('reminder_time', now)
-
-    if (overdueReminders) {
-      for (const reminder of overdueReminders as any[]) {
-        const overdueKey = `${reminder.id}-overdue`
-        if (notified.includes(overdueKey)) continue
-
-        const itemName = reminder.list_items?.content || 'Élément'
-        const listName = reminder.list_items?.lists?.name || 'Liste'
+        console.log('[Notifications] Sending notification:', message)
 
         this.sendNotification(
-          `Échéance dépassée: ${itemName}`,
-          `L'élément "${itemName}" de la liste "${listName}" est en retard !`,
+          `🔔 ${itemName}`,
+          message,
           { itemId: reminder.item_id }
         )
 
-        notified.push(overdueKey)
+        // Mark as notified locally
+        notified.push(reminderId)
         localStorage.setItem(notifiedKey, JSON.stringify(notified))
+
+        // Mark as sent in database
+        await supabase
+          .from('reminders')
+          .update({ is_sent: true })
+          .eq('id', reminderId)
+
+        console.log('[Notifications] Marked reminder as sent:', reminderId)
       }
     }
+
+    console.log('[Notifications] Check complete')
   }
 
   /**
