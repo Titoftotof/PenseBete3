@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { showGlobalToast } from '@/components/ui/toast'
+import { subscribeToPush, unsubscribeFromPush, isPushSupported } from './pushNotifications'
 
 const NOTIFICATIONS_ENABLED_KEY = 'pensebete-notifications-enabled'
 
@@ -83,6 +84,11 @@ class NotificationService {
     // Start checking for reminders periodically
     this.startReminderCheck()
 
+    // Subscribe to push notifications if permission granted
+    if (this.permission === 'granted' && isPushSupported()) {
+      subscribeToPush().catch(console.error)
+    }
+
     return this.permission === 'granted'
   }
 
@@ -108,6 +114,10 @@ class NotificationService {
       if (result === 'granted') {
         localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'granted')
         this.startReminderCheck()
+        // Subscribe to push notifications for background alerts
+        if (isPushSupported()) {
+          subscribeToPush().catch(console.error)
+        }
         return { granted: true, message: 'Notifications activées !' }
       } else if (result === 'denied') {
         localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, result)
@@ -131,6 +141,8 @@ class NotificationService {
     this.permission = 'default'
     localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'disabled')
     this.stopReminderCheck()
+    // Unsubscribe from push notifications
+    unsubscribeFromPush().catch(console.error)
   }
 
   enable(): void {
@@ -138,6 +150,10 @@ class NotificationService {
       this.permission = 'granted'
       localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'granted')
       this.startReminderCheck()
+      // Subscribe to push notifications
+      if (isPushSupported()) {
+        subscribeToPush().catch(console.error)
+      }
     }
   }
 
