@@ -23,7 +23,7 @@ export default function CalendarPage() {
 
   // Get all items with due dates
   const itemsWithDueDates = useMemo(() => {
-    return items.filter(item => item.due_date !== undefined)
+    return items.filter(item => item.due_date !== null && item.due_date !== undefined)
   }, [items])
 
   // Get items for selected date
@@ -123,8 +123,8 @@ export default function CalendarPage() {
                         <button
                           onClick={() => toggleItemComplete(item.id)}
                           className={`h-6 w-6 rounded-lg border-2 flex items-center justify-center transition-all ${item.is_completed
-                              ? 'border-green-500 bg-green-500'
-                              : 'border-border hover:border-green-500'
+                            ? 'border-green-500 bg-green-500'
+                            : 'border-border hover:border-green-500'
                             }`}
                         >
                           {item.is_completed && <CheckCircle className="h-3.5 w-3.5 text-white" />}

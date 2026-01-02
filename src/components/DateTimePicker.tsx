@@ -3,12 +3,12 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import { fr } from 'date-fns/locale'
 import { GlassCard, GlassCardContent } from '@/components/ui/glass-card'
 import { Button } from '@/components/ui/button'
-import { Calendar, Clock, X, ChevronLeft, ChevronRight, Trash2, Repeat } from 'lucide-react'
+import { Calendar, Clock, X, ChevronLeft, ChevronRight, Trash2, Repeat, Bell } from 'lucide-react'
 
 interface DateTimePickerProps {
   isOpen: boolean
   onClose: () => void
-  onConfirm: (date: Date, recurrence?: { type: 'daily' | 'weekly' | 'monthly' | 'yearly', interval: number }) => void
+  onConfirm: (date: Date, recurrence?: { type: 'daily' | 'weekly' | 'monthly' | 'yearly', interval: number }, isReminderEnabled?: boolean) => void
   onDelete?: () => void
   initialDate?: Date
   initialRecurrence?: { type: 'daily' | 'weekly' | 'monthly' | 'yearly', interval: number } | null
@@ -44,6 +44,7 @@ export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDa
 
   const [recurrenceType, setRecurrenceType] = useState<'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'>('none')
   const [recurrenceInterval, setRecurrenceInterval] = useState(1)
+  const [isReminderEnabled, setIsReminderEnabled] = useState(true)
 
   useEffect(() => {
     if (isOpen) {
@@ -59,9 +60,11 @@ export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDa
       if (initialRecurrence) {
         setRecurrenceType(initialRecurrence.type)
         setRecurrenceInterval(initialRecurrence.interval)
+        setIsReminderEnabled(true)
       } else {
         setRecurrenceType('none')
         setRecurrenceInterval(1)
+        setIsReminderEnabled(initialDate ? true : false) // Default to true if editing, false if new
       }
     }
   }, [isOpen, initialDate, initialRecurrence])
@@ -104,11 +107,11 @@ export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDa
     const result = new Date(selectedDate)
     result.setHours(hours, minutes, 0, 0)
 
-    const recurrence = recurrenceType !== 'none'
+    const recurrence = isReminderEnabled && recurrenceType !== 'none'
       ? { type: recurrenceType, interval: recurrenceInterval }
       : undefined
 
-    onConfirm(result, recurrence)
+    onConfirm(result, recurrence, isReminderEnabled)
     onClose()
   }
 
@@ -142,7 +145,7 @@ export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDa
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-semibold flex items-center gap-2">
               <Calendar className="h-5 w-5 text-purple-500" />
-              Définir un rappel
+              Échéance & Rappel
             </h3>
             <Button variant="ghost" size="icon" onClick={onClose} className="rounded-xl">
               <X className="h-5 w-5" />
@@ -236,60 +239,82 @@ export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDa
             />
           </div>
 
-          {/* Recurrence */}
-          <div className="mb-4">
-            <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
-              <Repeat className="h-4 w-4" />
-              Récurrence
-            </p>
-            <div className="space-y-2">
-              <select
-                value={recurrenceType}
-                onChange={(e) => setRecurrenceType(e.target.value as any)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 [&>option]:bg-gray-950 [&>option]:text-white"
-              >
-                <option value="none">Aucune</option>
-                <option value="daily">Tous les jours</option>
-                <option value="weekly">Toutes les semaines</option>
-                <option value="monthly">Tous les mois</option>
-                <option value="yearly">Tous les ans</option>
-              </select>
-
-              {recurrenceType !== 'none' && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Tous les</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={recurrenceInterval}
-                    onChange={(e) => setRecurrenceInterval(parseInt(e.target.value) || 1)}
-                    className="w-16 bg-white/5 border border-white/10 rounded-xl px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    {recurrenceType === 'daily' && 'jours'}
-                    {recurrenceType === 'weekly' && 'semaines'}
-                    {recurrenceType === 'monthly' && 'mois'}
-                    {recurrenceType === 'yearly' && 'ans'}
-                  </span>
-                </div>
-              )}
+          {/* Reminder Toggle */}
+          <div className="mb-4 flex items-center justify-between p-3 rounded-xl glass border border-white/10">
+            <div className="flex items-center gap-2">
+              <Bell className={isReminderEnabled ? "h-5 w-5 text-purple-500" : "h-5 w-5 text-muted-foreground"} />
+              <div>
+                <p className="text-sm font-medium">Activer le rappel</p>
+                <p className="text-xs text-muted-foreground">Recevoir une notification</p>
+              </div>
             </div>
+            <button
+              onClick={() => setIsReminderEnabled(!isReminderEnabled)}
+              className={`w-12 h-6 rounded-full transition-colors relative ${isReminderEnabled ? 'bg-purple-500' : 'bg-gray-600'}`}
+            >
+              <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isReminderEnabled ? 'left-7' : 'left-1'}`} />
+            </button>
           </div>
+
+          {/* Recurrence */}
+          {isReminderEnabled && (
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                <Repeat className="h-4 w-4" />
+                Récurrence
+              </p>
+              <div className="space-y-2">
+                <select
+                  value={recurrenceType}
+                  onChange={(e) => setRecurrenceType(e.target.value as any)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 [&>option]:bg-gray-950 [&>option]:text-white"
+                >
+                  <option value="none">Aucune</option>
+                  <option value="daily">Tous les jours</option>
+                  <option value="weekly">Toutes les semaines</option>
+                  <option value="monthly">Tous les mois</option>
+                  <option value="yearly">Tous les ans</option>
+                </select>
+
+                {recurrenceType !== 'none' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Tous les</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={recurrenceInterval}
+                      onChange={(e) => setRecurrenceInterval(parseInt(e.target.value) || 1)}
+                      className="w-16 bg-white/5 border border-white/10 rounded-xl px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {recurrenceType === 'daily' && 'jours'}
+                      {recurrenceType === 'weekly' && 'semaines'}
+                      {recurrenceType === 'monthly' && 'mois'}
+                      {recurrenceType === 'yearly' && 'ans'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Preview */}
           <div className="mb-4 p-3 rounded-xl bg-purple-500/10 border border-purple-500/30">
             <p className="text-sm text-center text-muted-foreground">
-              Rappel prévu pour :
+              Échéance prévue le :
             </p>
             <p className="text-base font-semibold text-center mt-1 capitalize">
               {formatDateLong(selectedDate)} à {selectedTime}
             </p>
-            {recurrenceType !== 'none' && (
+            {isReminderEnabled ? (
               <p className="text-xs text-center text-purple-400 mt-1">
-                Répétition : {recurrenceType === 'daily' ? 'Chaque jour' :
+                🔔 Rappel activé {recurrenceType !== 'none' ? `(${recurrenceType === 'daily' ? 'Chaque jour' :
                   recurrenceType === 'weekly' ? 'Chaque semaine' :
-                    recurrenceType === 'monthly' ? 'Chaque mois' : 'Chaque an'}
-                {recurrenceInterval > 1 ? ` (tous les ${recurrenceInterval})` : ''}
+                    recurrenceType === 'monthly' ? 'Chaque mois' : 'Chaque an'}${recurrenceInterval > 1 ? ` tous les ${recurrenceInterval}` : ''})` : ''}
+              </p>
+            ) : (
+              <p className="text-xs text-center text-muted-foreground mt-1 italic">
+                Pas de rappel (notification)
               </p>
             )}
           </div>

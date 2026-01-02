@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { addDays, endOfDay, setHours, setMinutes } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GlassCard, GlassCardContent } from '@/components/ui/glass-card'
@@ -6,10 +7,11 @@ import { SwipeableItem } from '@/components/SwipeableItem'
 import { FrequentItemsSuggestions } from '@/components/FrequentItemsSuggestions'
 import { VoiceInputButton } from '@/components/VoiceInputButton'
 import { DateTimePicker } from '@/components/DateTimePicker'
-import { ArrowLeft, Plus, Trash2, Check, GripVertical, Flag, Archive, Undo, Layers, List as ListIcon, Bell, BellOff } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Check, GripVertical, Flag, Archive, Undo, Layers, List as ListIcon, Bell, BellOff, Calendar } from 'lucide-react'
 import { useListStore } from '@/stores/listStore'
 import { useFrequentItemsStore } from '@/stores/frequentItemsStore'
 import { useReminderStore } from '@/stores/reminderStore'
+import { useSettingsStore, type DefaultDeadlineRule } from '@/stores/settingsStore'
 import { parseVoiceInputWithPriorities } from '@/lib/voiceParser'
 import { categorizeItem, getCategoryColor } from '@/lib/categorizer'
 import type { List, ListItem, Priority, Reminder } from '@/types'
@@ -72,6 +74,7 @@ function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, on
     opacity: isDragging ? 0.5 : 1,
   }
 
+  const [isFocused, setIsFocused] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -97,7 +100,7 @@ function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, on
   }
 
   const itemContent = (
-    <GlassCard className={`group overflow-visible ${isOverdue ? 'border-red-500/50 bg-red-500/10' : ''}`} hover={false} style={style}>
+    <GlassCard className={`group overflow-visible ${isOverdue ? 'border-red-500/50 bg-red-500/10' : ''}`} hover={false}>
       <GlassCardContent className="flex items-center gap-3 p-3">
         <button
           {...attributes}
@@ -129,11 +132,13 @@ function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, on
             }}
             rows={1}
             className={`block w-full bg-transparent border-none focus:outline-none focus:ring-0 resize-none overflow-hidden whitespace-pre-wrap break-words p-0 ${item.is_completed ? 'line-through opacity-60' : ''}`}
-            data-no-swipe="true"
+            data-no-swipe={isFocused ? "true" : undefined}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
           />
           {reminderTime && (
-            <span className={`text-xs flex items-center gap-1 mt-0.5 ${isOverdue ? 'text-red-500' : 'text-purple-500'}`}>
-              <Bell className="h-3 w-3" />
+            <span className={`text-xs flex items-center gap-1 mt-0.5 ${isOverdue ? 'text-red-500' : reminder?.reminder_time ? 'text-purple-500' : 'text-blue-500'}`}>
+              {reminder?.reminder_time ? <Bell className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
               {formatReminderDateTime(reminderTime)}
             </span>
           )}
@@ -173,16 +178,16 @@ function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, on
           {reminderTime ? (
             <button
               onClick={onSetReminder}
-              className="p-2 rounded-xl hover:bg-accent transition-colors text-purple-500"
-              title={`Modifier le rappel (${formatReminderDateTime(reminderTime)})`}
+              className={`p-2 rounded-xl hover:bg-accent transition-colors ${reminder?.reminder_time ? 'text-purple-500' : 'text-blue-500'}`}
+              title={reminder?.reminder_time ? `Modifier le rappel (${formatReminderDateTime(reminderTime)})` : `Modifier l'échéance (${formatReminderDateTime(reminderTime)})`}
             >
-              <Bell className="h-4 w-4" />
+              {reminder?.reminder_time ? <Bell className="h-4 w-4" /> : <Calendar className="h-4 w-4" />}
             </button>
           ) : (
             <button
               onClick={onSetReminder}
               className="p-2 rounded-xl hover:bg-accent transition-colors text-muted-foreground"
-              title="Ajouter un rappel"
+              title="Ajouter une échéance ou un rappel"
             >
               <BellOff className="h-4 w-4" />
             </button>
@@ -217,6 +222,22 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
   const { items, fetchItems, createItem, toggleItemComplete, deleteItem, updateItem, reorderItems, archiveItem, unarchiveItem, loading } = useListStore()
   const { trackItem } = useFrequentItemsStore()
   const { createReminder, getReminderByItemId, deleteReminder, updateReminder, fetchReminders } = useReminderStore()
+  const { defaultDeadlineRule } = useSettingsStore()
+
+  const calculateDefaultDeadline = useCallback((rule: DefaultDeadlineRule): string | null => {
+    const now = new Date()
+    switch (rule) {
+      case 'tomorrow_9am':
+        return setMinutes(setHours(addDays(now, 1), 9), 0).toISOString()
+      case 'end_of_day':
+        return endOfDay(now).toISOString()
+      case 'plus_7_days':
+        return addDays(now, 7).toISOString()
+      case 'none':
+      default:
+        return null
+    }
+  }, [])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -246,7 +267,8 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
     if (!newItemContent.trim()) return
 
     const content = newItemContent.trim()
-    await createItem(list.id, content)
+    const dueDate = calculateDefaultDeadline(defaultDeadlineRule)
+    await createItem(list.id, content, dueDate)
     await trackItem(content)
     setNewItemContent('')
   }
@@ -269,7 +291,8 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
     if (!parsedVoiceItems) return
 
     for (const item of parsedVoiceItems) {
-      await createItem(list.id, item.content)
+      const dueDate = calculateDefaultDeadline(defaultDeadlineRule)
+      await createItem(list.id, item.content, dueDate)
       await trackItem(item.content)
 
       // Set priority if not normal
@@ -306,18 +329,25 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
     setReminderPickerItem(item)
   }
 
-  const handleReminderConfirm = async (date: Date, recurrence?: { type: 'daily' | 'weekly' | 'monthly' | 'yearly', interval: number }) => {
+  const handleReminderConfirm = async (date: Date, recurrence?: { type: 'daily' | 'weekly' | 'monthly' | 'yearly', interval: number }, isReminderEnabled?: boolean) => {
     if (!reminderPickerItem) return
 
     const existingReminder = getReminderByItemId(reminderPickerItem.id)
-    if (existingReminder) {
-      // Update existing reminder
-      await updateReminder(existingReminder.id, date, recurrence)
-    } else {
-      // Create new reminder
-      await createReminder(reminderPickerItem.id, date, recurrence)
+
+    if (isReminderEnabled) {
+      if (existingReminder) {
+        // Update existing reminder
+        await updateReminder(existingReminder.id, date, recurrence)
+      } else {
+        // Create new reminder
+        await createReminder(reminderPickerItem.id, date, recurrence)
+      }
+    } else if (existingReminder) {
+      // Delete reminder if it was disabled
+      await deleteReminder(existingReminder.id)
     }
-    // Also update the item's due_date for backward compatibility
+
+    // Always update the item's due_date
     await updateItem(reminderPickerItem.id, { due_date: date.toISOString() })
     setReminderPickerItem(null)
   }
@@ -502,49 +532,55 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
             {showCompleted && (
               <div className="space-y-2">
                 {completedItems.map((item) => (
-                  <GlassCard key={item.id} className="opacity-70" hover={false}>
-                    <GlassCardContent className="flex items-center gap-3 p-3">
-                      <button
-                        onClick={() => toggleItemComplete(item.id)}
-                        className="h-6 w-6 rounded-lg border-2 border-green-500 bg-green-500 flex items-center justify-center shrink-0"
-                        data-no-swipe="true"
-                      >
-                        <Check className="h-3.5 w-3.5 text-white" />
-                      </button>
-                      <textarea
-                        readOnly
-                        value={item.content}
-                        onInput={(e) => {
-                          const target = e.target as HTMLTextAreaElement;
-                          target.style.height = 'auto';
-                          target.style.height = `${target.scrollHeight}px`;
-                        }}
-                        rows={1}
-                        className="flex-1 line-through text-muted-foreground bg-transparent border-none focus:outline-none resize-none overflow-hidden whitespace-pre-wrap break-words p-0"
-                        style={{ height: 'auto' }}
-                      />
-                      <div className="flex gap-1 shrink-0" data-no-swipe="true">
-                        <Button
-                          variant="glass"
-                          size="icon"
-                          className="rounded-xl text-blue-500 h-8 w-8"
-                          onClick={() => archiveItem(item.id)}
-                          title="Archiver"
+                  <SwipeableItem
+                    key={item.id}
+                    onDelete={() => deleteItem(item.id)}
+                    onComplete={() => toggleItemComplete(item.id)}
+                  >
+                    <GlassCard className="opacity-70" hover={false}>
+                      <GlassCardContent className="flex items-center gap-3 p-3">
+                        <button
+                          onClick={() => toggleItemComplete(item.id)}
+                          className="h-6 w-6 rounded-lg border-2 border-green-500 bg-green-500 flex items-center justify-center shrink-0"
+                          data-no-swipe="true"
                         >
-                          <Archive className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="glass"
-                          size="icon"
-                          className="rounded-xl text-red-500 h-8 w-8"
-                          onClick={() => deleteItem(item.id)}
-                          title="Supprimer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </GlassCardContent>
-                  </GlassCard>
+                          <Check className="h-3.5 w-3.5 text-white" />
+                        </button>
+                        <textarea
+                          readOnly
+                          value={item.content}
+                          onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${target.scrollHeight}px`;
+                          }}
+                          rows={1}
+                          className="flex-1 line-through text-muted-foreground bg-transparent border-none focus:outline-none resize-none overflow-hidden whitespace-pre-wrap break-words p-0"
+                          style={{ height: 'auto' }}
+                        />
+                        <div className="flex gap-1 shrink-0" data-no-swipe="true">
+                          <Button
+                            variant="glass"
+                            size="icon"
+                            className="rounded-xl text-blue-500 h-8 w-8"
+                            onClick={() => archiveItem(item.id)}
+                            title="Archiver"
+                          >
+                            <Archive className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="glass"
+                            size="icon"
+                            className="rounded-xl text-red-500 h-8 w-8"
+                            onClick={() => deleteItem(item.id)}
+                            title="Supprimer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </GlassCardContent>
+                    </GlassCard>
+                  </SwipeableItem>
                 ))}
               </div>
             )}
@@ -567,43 +603,49 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
             {showArchived && (
               <div className="space-y-2">
                 {archivedItems.map((item) => (
-                  <GlassCard key={item.id} className="opacity-50" hover={false}>
-                    <GlassCardContent className="flex items-center gap-3 p-3">
-                      <Archive className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <textarea
-                        readOnly
-                        value={item.content}
-                        onInput={(e) => {
-                          const target = e.target as HTMLTextAreaElement;
-                          target.style.height = 'auto';
-                          target.style.height = `${target.scrollHeight}px`;
-                        }}
-                        rows={1}
-                        className="flex-1 line-through text-sm text-muted-foreground bg-transparent border-none focus:outline-none resize-none overflow-hidden whitespace-pre-wrap break-words p-0"
-                        style={{ height: 'auto' }}
-                      />
-                      <div className="flex gap-1 shrink-0" data-no-swipe="true">
-                        <Button
-                          variant="glass"
-                          size="icon"
-                          className="rounded-xl text-blue-500 h-8 w-8"
-                          onClick={() => unarchiveItem(item.id)}
-                          title="Désarchiver"
-                        >
-                          <Undo className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="glass"
-                          size="icon"
-                          className="rounded-xl text-red-500 h-8 w-8"
-                          onClick={() => deleteItem(item.id)}
-                          title="Supprimer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </GlassCardContent>
-                  </GlassCard>
+                  <SwipeableItem
+                    key={item.id}
+                    onDelete={() => deleteItem(item.id)}
+                    onComplete={() => unarchiveItem(item.id)}
+                  >
+                    <GlassCard className="opacity-50" hover={false}>
+                      <GlassCardContent className="flex items-center gap-3 p-3">
+                        <Archive className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <textarea
+                          readOnly
+                          value={item.content}
+                          onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${target.scrollHeight}px`;
+                          }}
+                          rows={1}
+                          className="flex-1 line-through text-sm text-muted-foreground bg-transparent border-none focus:outline-none resize-none overflow-hidden whitespace-pre-wrap break-words p-0"
+                          style={{ height: 'auto' }}
+                        />
+                        <div className="flex gap-1 shrink-0" data-no-swipe="true">
+                          <Button
+                            variant="glass"
+                            size="icon"
+                            className="rounded-xl text-blue-500 h-8 w-8"
+                            onClick={() => unarchiveItem(item.id)}
+                            title="Désarchiver"
+                          >
+                            <Undo className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="glass"
+                            size="icon"
+                            className="rounded-xl text-red-500 h-8 w-8"
+                            onClick={() => deleteItem(item.id)}
+                            title="Supprimer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </GlassCardContent>
+                    </GlassCard>
+                  </SwipeableItem>
                 ))}
               </div>
             )}

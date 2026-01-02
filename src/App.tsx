@@ -6,6 +6,7 @@ import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
 import CalendarPage from '@/pages/CalendarPage'
 import { ToastProvider } from '@/components/ui/toast'
+import { SettingsModal } from '@/components/SettingsModal'
 
 function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -38,6 +39,7 @@ function App() {
 
   return (
     <ToastProvider>
+      <SettingsModal />
       <BrowserRouter>
         <Routes>
           <Route

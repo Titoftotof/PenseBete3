@@ -2,24 +2,24 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { LogOut, Sun, Moon, Monitor, ClipboardList, WifiOff, RotateCw, Calendar, Bell, BellOff, X, AlertCircle } from 'lucide-react'
-import { useTheme } from '@/hooks/useTheme'
+import { LogOut, ClipboardList, WifiOff, RotateCw, Calendar, Bell, BellOff, X, AlertCircle, Settings } from 'lucide-react'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { useSyncStore } from '@/stores/syncStore'
 import { useNotifications } from '@/hooks/useNotifications'
 import { useReminderStore } from '@/stores/reminderStore'
 import { useListStore } from '@/stores/listStore'
 import { useLocation } from 'react-router-dom'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 export function Header() {
   const [logoutLoading, setLogoutLoading] = useState(false)
   const [showRemindersMenu, setShowRemindersMenu] = useState(false)
-  const { theme, toggleTheme } = useTheme()
   const isOnline = useOnlineStatus()
   const { pendingOperations, isSyncing, setOnlineStatus } = useSyncStore()
   const { isEnabled: notificationsEnabled, toggleNotifications, errorMessage, clearError, status } = useNotifications()
   const { fetchReminders, getUpcomingReminders, deleteReminder } = useReminderStore()
   const { items, fetchAllItems } = useListStore()
+  const { setIsSettingsOpen } = useSettingsStore()
   const location = useLocation()
 
   // Fetch reminders and items on mount
@@ -58,17 +58,6 @@ export function Header() {
     setLogoutLoading(true)
     await supabase.auth.signOut()
     setLogoutLoading(false)
-  }
-
-  const getThemeIcon = () => {
-    switch (theme) {
-      case 'light':
-        return <Sun className="h-5 w-5" />
-      case 'dark':
-        return <Moon className="h-5 w-5" />
-      default:
-        return <Monitor className="h-5 w-5" />
-    }
   }
 
   const pendingCount = pendingOperations.length
@@ -245,8 +234,8 @@ export function Header() {
                         }
                       }}
                       className={`text-sm w-full text-center py-2.5 px-4 rounded-lg font-medium transition-colors ${notificationsEnabled
-                          ? 'bg-red-500/15 text-red-500 hover:bg-red-500/25'
-                          : 'bg-green-500/15 text-green-500 hover:bg-green-500/25'
+                        ? 'bg-red-500/15 text-red-500 hover:bg-red-500/25'
+                        : 'bg-green-500/15 text-green-500 hover:bg-green-500/25'
                         }`}
                     >
                       {notificationsEnabled ? 'Désactiver les notifications' : 'Activer les notifications'}
@@ -259,11 +248,11 @@ export function Header() {
           <Button
             variant="glass"
             size="icon"
-            onClick={toggleTheme}
-            title={`Thème: ${theme}`}
+            onClick={() => setIsSettingsOpen(true)}
+            title="Paramètres"
             className="rounded-xl"
           >
-            {getThemeIcon()}
+            <Settings className="h-5 w-5" />
           </Button>
           <Button
             variant="glass"

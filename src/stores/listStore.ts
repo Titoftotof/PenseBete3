@@ -21,7 +21,7 @@ interface ListStore {
   // Items
   fetchItems: (listId: string) => Promise<void>
   fetchAllItems: () => Promise<void>
-  createItem: (listId: string, content: string) => Promise<ListItem | null>
+  createItem: (listId: string, content: string, dueDate?: string | null) => Promise<ListItem | null>
   updateItem: (id: string, updates: Partial<Pick<ListItem, 'content' | 'is_completed' | 'is_archived' | 'position' | 'priority' | 'due_date' | 'grocery_category'>>) => Promise<void>
   deleteItem: (id: string) => Promise<void>
   toggleItemComplete: (id: string) => Promise<void>
@@ -194,7 +194,7 @@ export const useListStore = create<ListStore>((set, get) => ({
   },
 
   // Create a new item
-  createItem: async (listId: string, content: string) => {
+  createItem: async (listId: string, content: string, dueDate?: string | null) => {
     set({ loading: true, error: null })
 
     // Get the max position
@@ -205,7 +205,7 @@ export const useListStore = create<ListStore>((set, get) => ({
 
     const { data, error } = await supabase
       .from('list_items')
-      .insert({ list_id: listId, content, position: maxPosition })
+      .insert({ list_id: listId, content, position: maxPosition, due_date: dueDate })
       .select()
       .single()
 
