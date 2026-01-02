@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { LogOut, ClipboardList, WifiOff, RotateCw, Calendar, Bell, BellOff, X, AlertCircle, Settings } from 'lucide-react'
+import { LogOut, ClipboardList, WifiOff, RotateCw, Calendar, Bell, BellOff, X, AlertCircle, Settings, Repeat } from 'lucide-react'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { useSyncStore } from '@/stores/syncStore'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -48,6 +48,24 @@ export function Header() {
 
   // Check if reminder is overdue
   const isOverdue = (dateStr: string) => new Date(dateStr) < new Date()
+
+  // Format recurrence type
+  const formatRecurrence = (type: string | null, interval: number | null) => {
+    if (!type || type === 'none') return null
+    const n = interval || 1
+    switch (type) {
+      case 'daily':
+        return n === 1 ? 'Tous les jours' : `Tous les ${n} jours`
+      case 'weekly':
+        return n === 1 ? 'Toutes les semaines' : `Toutes les ${n} semaines`
+      case 'monthly':
+        return n === 1 ? 'Tous les mois' : `Tous les ${n} mois`
+      case 'yearly':
+        return n === 1 ? 'Tous les ans' : `Tous les ${n} ans`
+      default:
+        return null
+    }
+  }
 
   // Sync online status with store
   useEffect(() => {
@@ -151,34 +169,43 @@ export function Header() {
                         Aucun rappel programmé
                       </div>
                     ) : (
-                      upcomingReminders.map((reminder) => (
-                        <div
-                          key={reminder.id}
-                          className={`p-4 border-b border-border last:border-b-0 hover:bg-accent/50 transition-colors ${isOverdue(reminder.reminder_time) ? 'bg-red-500/10' : ''
-                            }`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">
-                                {getItemContent(reminder.item_id)}
-                              </p>
-                              <p className={`text-xs mt-1 flex items-center gap-1 ${isOverdue(reminder.reminder_time) ? 'text-red-500 font-medium' : 'text-purple-500'
-                                }`}>
-                                <Bell className="h-3 w-3" />
-                                {formatReminderDateTime(reminder.reminder_time)}
-                                {isOverdue(reminder.reminder_time) && ' (en retard)'}
-                              </p>
+                      upcomingReminders.map((reminder) => {
+                        const recurrenceText = formatRecurrence(reminder.recurrence_type, reminder.recurrence_interval)
+                        return (
+                          <div
+                            key={reminder.id}
+                            className={`p-4 border-b border-border last:border-b-0 hover:bg-accent/50 transition-colors ${isOverdue(reminder.reminder_time) ? 'bg-red-500/10' : ''
+                              }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  {getItemContent(reminder.item_id)}
+                                </p>
+                                <p className={`text-xs mt-1 flex items-center gap-1 ${isOverdue(reminder.reminder_time) ? 'text-red-500 font-medium' : 'text-purple-500'
+                                  }`}>
+                                  <Bell className="h-3 w-3" />
+                                  {formatReminderDateTime(reminder.reminder_time)}
+                                  {isOverdue(reminder.reminder_time) && ' (en retard)'}
+                                </p>
+                                {recurrenceText && (
+                                  <p className="text-xs mt-1 flex items-center gap-1 text-blue-500">
+                                    <Repeat className="h-3 w-3" />
+                                    {recurrenceText}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => deleteReminder(reminder.id)}
+                                className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-500 transition-colors"
+                                title="Supprimer le rappel"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
                             </div>
-                            <button
-                              onClick={() => deleteReminder(reminder.id)}
-                              className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-500 transition-colors"
-                              title="Supprimer le rappel"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
                           </div>
-                        </div>
-                      ))
+                        )
+                      })
                     )}
                   </div>
                   <div className="p-3 border-t border-border bg-muted/30 space-y-2">

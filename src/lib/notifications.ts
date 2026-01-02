@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { showGlobalToast } from '@/components/ui/toast'
 import { subscribeToPush, unsubscribeFromPush, isPushSupported } from './pushNotifications'
+import { addDays, addWeeks, addMonths, addYears } from 'date-fns'
 
 const NOTIFICATIONS_ENABLED_KEY = 'pensebete-notifications-enabled'
 
@@ -306,16 +307,62 @@ class NotificationService {
         notified.push(reminderId)
         localStorage.setItem(notifiedKey, JSON.stringify(notified))
 
-        // Mark as sent in database
-        await supabase
-          .from('reminders')
-          .update({
-            is_sent: true,
-            sent_at: new Date().toISOString()
-          })
-          .eq('id', reminderId)
+        // Check if reminder has recurrence
+        const recurrenceType = reminder.recurrence_type
+        const recurrenceInterval = reminder.recurrence_interval || 1
 
-        console.log('[Notifications] Marked reminder as sent:', reminderId)
+        if (recurrenceType && recurrenceType !== 'none') {
+          // Calculate next reminder time based on recurrence
+          const currentReminderTime = new Date(reminder.reminder_time)
+          let nextReminderTime: Date
+
+          switch (recurrenceType) {
+            case 'daily':
+              nextReminderTime = addDays(currentReminderTime, recurrenceInterval)
+              break
+            case 'weekly':
+              nextReminderTime = addWeeks(currentReminderTime, recurrenceInterval)
+              break
+            case 'monthly':
+              nextReminderTime = addMonths(currentReminderTime, recurrenceInterval)
+              break
+            case 'yearly':
+              nextReminderTime = addYears(currentReminderTime, recurrenceInterval)
+              break
+            default:
+              nextReminderTime = addDays(currentReminderTime, 1)
+          }
+
+          console.log('[Notifications] Recurring reminder, scheduling next occurrence:', {
+            recurrenceType,
+            recurrenceInterval,
+            currentTime: reminder.reminder_time,
+            nextTime: nextReminderTime.toISOString()
+          })
+
+          // Update reminder with next occurrence (reset is_sent to false)
+          await supabase
+            .from('reminders')
+            .update({
+              reminder_time: nextReminderTime.toISOString(),
+              is_sent: false,
+              sent_at: null
+            })
+            .eq('id', reminderId)
+
+          console.log('[Notifications] Scheduled next recurring reminder:', reminderId)
+        } else {
+          // Non-recurring reminder: mark as sent in database
+          await supabase
+            .from('reminders')
+            .update({
+              is_sent: true,
+              sent_at: new Date().toISOString()
+            })
+            .eq('id', reminderId)
+
+          console.log('[Notifications] Marked non-recurring reminder as sent:', reminderId)
+        }
       }
     }
 
