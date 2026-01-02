@@ -113,7 +113,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
     let finalReminderTime = reminderTime
 
     // If adding/updating recurrence and the time is in the past, calculate next future occurrence
-    if (recurrence?.type && recurrence.type !== 'none') {
+    if (recurrence?.type) {
       const now = new Date()
       if (reminderTime <= now) {
         finalReminderTime = getNextFutureOccurrence(

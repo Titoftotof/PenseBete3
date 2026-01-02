@@ -50,7 +50,7 @@ export function Header() {
   const isOverdue = (dateStr: string) => new Date(dateStr) < new Date()
 
   // Format recurrence type
-  const formatRecurrence = (type: string | null, interval: number | null) => {
+  const formatRecurrence = (type: string | null | undefined, interval: number | null | undefined) => {
     if (!type || type === 'none') return null
     const n = interval || 1
     switch (type) {
