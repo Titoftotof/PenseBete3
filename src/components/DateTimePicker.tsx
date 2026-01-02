@@ -13,6 +13,7 @@ interface DateTimePickerProps {
 }
 
 const QUICK_OPTIONS = [
+  { label: 'Dans 5 min', minutes: 5 },
   { label: 'Dans 1h', hours: 1 },
   { label: 'Dans 2h', hours: 2 },
   { label: 'Dans 4h', hours: 4 },
@@ -62,6 +63,8 @@ export function DateTimePicker({ isOpen, onClose, onConfirm, initialDate }: Date
       result.setDate(now.getDate() + option.days)
     } else if (option.hours) {
       result.setTime(now.getTime() + option.hours * 60 * 60 * 1000)
+    } else if ((option as any).minutes) {
+      result.setTime(now.getTime() + (option as any).minutes * 60 * 1000)
     }
 
     if (option.hourOfDay !== undefined) {
