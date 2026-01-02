@@ -22,7 +22,7 @@ class NotificationService {
    */
   isPWA(): boolean {
     return window.matchMedia('(display-mode: standalone)').matches ||
-           (window.navigator as any).standalone === true
+      (window.navigator as any).standalone === true
   }
 
   /**
@@ -309,7 +309,10 @@ class NotificationService {
         // Mark as sent in database
         await supabase
           .from('reminders')
-          .update({ is_sent: true })
+          .update({
+            is_sent: true,
+            sent_at: new Date().toISOString()
+          })
           .eq('id', reminderId)
 
         console.log('[Notifications] Marked reminder as sent:', reminderId)

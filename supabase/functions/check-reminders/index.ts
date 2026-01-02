@@ -183,7 +183,10 @@ Deno.serve(async (req: Request) => {
       // Mark reminder as sent
       const { error: updateError } = await supabase
         .from('reminders')
-        .update({ is_sent: true })
+        .update({
+          is_sent: true,
+          sent_at: new Date().toISOString()
+        })
         .eq('id', reminder.id)
 
       if (updateError) {

@@ -69,5 +69,6 @@ export interface Reminder {
   item_id: string
   reminder_time: string
   is_sent: boolean
+  sent_at?: string | null
   created_at: string
 }

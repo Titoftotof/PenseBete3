@@ -78,7 +78,11 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
 
     const { error } = await supabase
       .from('reminders')
-      .update({ reminder_time: reminderTime.toISOString() })
+      .update({
+        reminder_time: reminderTime.toISOString(),
+        is_sent: false,
+        sent_at: null
+      })
       .eq('id', reminderId)
 
     if (error) {
@@ -87,7 +91,12 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       set((state) => ({
         reminders: state.reminders.map((reminder) =>
           reminder.id === reminderId
-            ? { ...reminder, reminder_time: reminderTime.toISOString() }
+            ? {
+              ...reminder,
+              reminder_time: reminderTime.toISOString(),
+              is_sent: false,
+              sent_at: null
+            }
             : reminder
         ),
         loading: false,
