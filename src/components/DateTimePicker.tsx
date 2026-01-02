@@ -3,12 +3,13 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import { fr } from 'date-fns/locale'
 import { GlassCard, GlassCardContent } from '@/components/ui/glass-card'
 import { Button } from '@/components/ui/button'
-import { Calendar, Clock, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Calendar, Clock, X, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 
 interface DateTimePickerProps {
   isOpen: boolean
   onClose: () => void
   onConfirm: (date: Date) => void
+  onDelete?: () => void
   initialDate?: Date
 }
 
@@ -24,7 +25,7 @@ const QUICK_OPTIONS = [
 
 const WEEK_DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
-export function DateTimePicker({ isOpen, onClose, onConfirm, initialDate }: DateTimePickerProps) {
+export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDate }: DateTimePickerProps) {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     if (initialDate) return new Date(initialDate)
@@ -219,6 +220,16 @@ export function DateTimePicker({ isOpen, onClose, onConfirm, initialDate }: Date
 
           {/* Actions */}
           <div className="flex gap-2">
+            {initialDate && onDelete && (
+              <Button
+                variant="outline"
+                onClick={onDelete}
+                className="rounded-xl text-red-500 border-red-500/30 hover:bg-red-500/10"
+                title="Supprimer le rappel"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={onClose}

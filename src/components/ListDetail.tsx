@@ -43,7 +43,6 @@ interface SortableItemProps {
   onDelete: () => void
   onUpdatePriority: (priority: Priority) => void
   onSetReminder: () => void
-  onRemoveReminder: () => void
 }
 
 const PRIORITY_CONFIG: Record<Priority, { color: string; label: string }> = {
@@ -55,7 +54,7 @@ const PRIORITY_CONFIG: Record<Priority, { color: string; label: string }> = {
 
 const PRIORITIES: Priority[] = ['low', 'normal', 'high', 'urgent']
 
-function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, onSetReminder, onRemoveReminder }: SortableItemProps) {
+function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, onSetReminder }: SortableItemProps) {
   const [showPriorityMenu, setShowPriorityMenu] = useState(false)
   const {
     attributes,
@@ -153,7 +152,7 @@ function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, on
         <div data-no-swipe="true">
           {reminderTime ? (
             <button
-              onClick={onRemoveReminder}
+              onClick={onSetReminder}
               className="p-2 rounded-xl hover:bg-accent transition-colors text-purple-500"
               title={`Modifier le rappel (${formatReminderDateTime(reminderTime)})`}
             >
@@ -414,7 +413,6 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
                       onDelete={() => deleteItem(item.id)}
                       onUpdatePriority={(priority) => handleUpdatePriority(item.id, priority)}
                       onSetReminder={() => handleSetReminder(item)}
-                      onRemoveReminder={() => handleRemoveReminder(item)}
                     />
                   ))}
                 </div>
@@ -439,7 +437,6 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
                   onDelete={() => deleteItem(item.id)}
                   onUpdatePriority={(priority) => handleUpdatePriority(item.id, priority)}
                   onSetReminder={() => handleSetReminder(item)}
-                  onRemoveReminder={() => handleRemoveReminder(item)}
                 />
               ))}
             </div>
@@ -619,6 +616,10 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
         isOpen={reminderPickerItem !== null}
         onClose={() => setReminderPickerItem(null)}
         onConfirm={handleReminderConfirm}
+        onDelete={reminderPickerItem ? async () => {
+          await handleRemoveReminder(reminderPickerItem)
+          setReminderPickerItem(null)
+        } : undefined}
         initialDate={
           reminderPickerItem
             ? (getReminderByItemId(reminderPickerItem.id)?.reminder_time
