@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GlassCard, GlassCardContent } from '@/components/ui/glass-card'
@@ -43,6 +43,7 @@ interface SortableItemProps {
   onDelete: () => void
   onUpdatePriority: (priority: Priority) => void
   onSetReminder: () => void
+  onUpdateContent: (content: string) => void
 }
 
 const PRIORITY_CONFIG: Record<Priority, { color: string; label: string }> = {
@@ -54,7 +55,7 @@ const PRIORITY_CONFIG: Record<Priority, { color: string; label: string }> = {
 
 const PRIORITIES: Priority[] = ['low', 'normal', 'high', 'urgent']
 
-function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, onSetReminder }: SortableItemProps) {
+function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, onSetReminder, onUpdateContent }: SortableItemProps) {
   const [showPriorityMenu, setShowPriorityMenu] = useState(false)
   const {
     attributes,
@@ -70,6 +71,15 @@ function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, on
     transition,
     opacity: isDragging ? 0.5 : 1,
   }
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    }
+  }, [item.content])
 
   const priority = item.priority || 'normal'
   const priorityConfig = PRIORITY_CONFIG[priority]
@@ -108,9 +118,19 @@ function SortableItem({ item, reminder, onToggle, onDelete, onUpdatePriority, on
           {item.is_completed && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
         </button>
         <div className="flex-1 min-w-0">
-          <span className={`block truncate ${item.is_completed ? 'line-through opacity-60' : ''}`}>
-            {item.content}
-          </span>
+          <textarea
+            ref={textareaRef}
+            value={item.content}
+            onChange={(e) => onUpdateContent(e.target.value)}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = 'auto';
+              target.style.height = `${target.scrollHeight}px`;
+            }}
+            rows={1}
+            className={`block w-full bg-transparent border-none focus:outline-none focus:ring-0 resize-none overflow-hidden whitespace-pre-wrap break-words p-0 ${item.is_completed ? 'line-through opacity-60' : ''}`}
+            data-no-swipe="true"
+          />
           {reminderTime && (
             <span className={`text-xs flex items-center gap-1 mt-0.5 ${isOverdue ? 'text-red-500' : 'text-purple-500'}`}>
               <Bell className="h-3 w-3" />
@@ -193,6 +213,7 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
   const [groupedByCategory, setGroupedByCategory] = useState(false)
   const [parsedVoiceItems, setParsedVoiceItems] = useState<Array<{ content: string; priority: Priority }> | null>(null)
   const [reminderPickerItem, setReminderPickerItem] = useState<ListItem | null>(null)
+  const titleRef = useRef<HTMLTextAreaElement>(null)
   const { items, fetchItems, createItem, toggleItemComplete, deleteItem, updateItem, reorderItems, archiveItem, unarchiveItem, loading } = useListStore()
   const { trackItem } = useFrequentItemsStore()
   const { createReminder, getReminderByItemId, deleteReminder, updateReminder, fetchReminders } = useReminderStore()
@@ -212,6 +233,13 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
     fetchItems(list.id)
     fetchReminders()
   }, [list.id, fetchItems, fetchReminders])
+
+  useEffect(() => {
+    if (titleRef.current) {
+      titleRef.current.style.height = 'auto'
+      titleRef.current.style.height = `${titleRef.current.scrollHeight}px`
+    }
+  }, [list.name])
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -278,16 +306,16 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
     setReminderPickerItem(item)
   }
 
-  const handleReminderConfirm = async (date: Date) => {
+  const handleReminderConfirm = async (date: Date, recurrence?: { type: 'daily' | 'weekly' | 'monthly' | 'yearly', interval: number }) => {
     if (!reminderPickerItem) return
 
     const existingReminder = getReminderByItemId(reminderPickerItem.id)
     if (existingReminder) {
       // Update existing reminder
-      await updateReminder(existingReminder.id, date)
+      await updateReminder(existingReminder.id, date, recurrence)
     } else {
       // Create new reminder
-      await createReminder(reminderPickerItem.id, date)
+      await createReminder(reminderPickerItem.id, date, recurrence)
     }
     // Also update the item's due_date for backward compatibility
     await updateItem(reminderPickerItem.id, { due_date: date.toISOString() })
@@ -341,22 +369,33 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Button variant="glass" size="icon" onClick={onBack} className="rounded-xl">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Button variant="glass" size="icon" onClick={onBack} className="rounded-xl shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h2 className="text-xl font-bold">{list.name}</h2>
+          <Button
+            variant="glass"
+            size="icon"
+            onClick={() => setGroupedByCategory(!groupedByCategory)}
+            className={`rounded-xl transition-colors ${groupedByCategory ? 'bg-purple-500/20 text-purple-500' : ''}`}
+            title={groupedByCategory ? 'Vue liste' : 'Vue par catégorie'}
+          >
+            {groupedByCategory ? <ListIcon className="h-5 w-5" /> : <Layers className="h-5 w-5" />}
+          </Button>
         </div>
-        <Button
-          variant="glass"
-          size="icon"
-          onClick={() => setGroupedByCategory(!groupedByCategory)}
-          className={`rounded-xl transition-colors ${groupedByCategory ? 'bg-purple-500/20 text-purple-500' : ''}`}
-          title={groupedByCategory ? 'Vue liste' : 'Vue par catégorie'}
-        >
-          {groupedByCategory ? <ListIcon className="h-5 w-5" /> : <Layers className="h-5 w-5" />}
-        </Button>
+        <textarea
+          ref={titleRef}
+          value={list.name}
+          onChange={(e) => useListStore.getState().updateList(list.id, { name: e.target.value })}
+          onInput={(e) => {
+            const target = e.target as HTMLTextAreaElement;
+            target.style.height = 'auto';
+            target.style.height = `${target.scrollHeight}px`;
+          }}
+          rows={1}
+          className="text-2xl font-bold bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 rounded-lg px-2 py-1 w-full resize-none overflow-hidden text-center"
+        />
       </div>
 
       {/* Add item form */}
@@ -392,224 +431,258 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
       </div>
 
       {/* Pending items - with category grouping or drag and drop */}
-      {groupedByCategory ? (
-        // Category view
-        <div className="space-y-4">
-          {Object.entries(itemsByCategory)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([category, categoryItems]) => (
-              <div key={category} className="space-y-2">
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium ${getCategoryColor(category as any)}`}>
-                  {category}
-                  <span className="opacity-70">({categoryItems.length})</span>
-                </div>
-                <div className="space-y-2">
-                  {categoryItems.map((item) => (
-                    <SortableItem
-                      key={item.id}
-                      item={item}
-                      reminder={getReminderByItemId(item.id)}
-                      onToggle={() => toggleItemComplete(item.id)}
-                      onDelete={() => deleteItem(item.id)}
-                      onUpdatePriority={(priority) => handleUpdatePriority(item.id, priority)}
-                      onSetReminder={() => handleSetReminder(item)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-        </div>
-      ) : (
-        // List view with drag and drop
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={sortedPendingItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2">
-              {sortedPendingItems.map((item) => (
-                <SortableItem
-                  key={item.id}
-                  item={item}
-                  reminder={getReminderByItemId(item.id)}
-                  onToggle={() => toggleItemComplete(item.id)}
-                  onDelete={() => deleteItem(item.id)}
-                  onUpdatePriority={(priority) => handleUpdatePriority(item.id, priority)}
-                  onSetReminder={() => handleSetReminder(item)}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      )}
-
-      {/* Completed items */}
-      {completedItems.length > 0 && (
-        <div className="space-y-2">
-          <button
-            onClick={() => setShowCompleted(!showCompleted)}
-            className="text-sm font-medium text-muted-foreground flex items-center gap-2 hover:text-foreground transition-colors w-full"
-          >
-            <Check className="h-4 w-4 text-green-500" />
-            Complétés ({completedItems.length})
-            <span className={`transition-transform ml-auto ${showCompleted ? 'rotate-180' : ''}`}>▼</span>
-          </button>
-          {showCompleted && (
-            <div className="space-y-2">
-              {completedItems.map((item) => (
-                <GlassCard key={item.id} className="opacity-70" hover={false}>
-                  <GlassCardContent className="flex items-center gap-3 p-3">
-                    <button
-                      onClick={() => toggleItemComplete(item.id)}
-                      className="h-6 w-6 rounded-lg border-2 border-green-500 bg-green-500 flex items-center justify-center shrink-0"
-                      data-no-swipe="true"
-                    >
-                      <Check className="h-3.5 w-3.5 text-white" />
-                    </button>
-                    <span className="flex-1 line-through text-muted-foreground min-w-0 truncate">{item.content}</span>
-                    <div className="flex gap-1 shrink-0" data-no-swipe="true">
-                      <Button
-                        variant="glass"
-                        size="icon"
-                        className="rounded-xl text-blue-500 h-8 w-8"
-                        onClick={() => archiveItem(item.id)}
-                        title="Archiver"
-                      >
-                        <Archive className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="glass"
-                        size="icon"
-                        className="rounded-xl text-red-500 h-8 w-8"
-                        onClick={() => deleteItem(item.id)}
-                        title="Supprimer"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </GlassCardContent>
-                </GlassCard>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Archived items section */}
-      {archivedItems.length > 0 && (
-        <div className="space-y-2">
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            className="text-sm font-medium text-muted-foreground flex items-center gap-2 hover:text-foreground transition-colors"
-          >
-            <Archive className="h-4 w-4" />
-            Archivés ({archivedItems.length})
-            <span className={`transition-transform ${showArchived ? 'rotate-180' : ''}`}>▼</span>
-          </button>
-          {showArchived && (
-            <div className="space-y-2">
-              {archivedItems.map((item) => (
-                <GlassCard key={item.id} className="opacity-50" hover={false}>
-                  <GlassCardContent className="flex items-center gap-3 p-3">
-                    <Archive className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="flex-1 line-through text-sm text-muted-foreground min-w-0 truncate">{item.content}</span>
-                    <div className="flex gap-1 shrink-0" data-no-swipe="true">
-                      <Button
-                        variant="glass"
-                        size="icon"
-                        className="rounded-xl text-blue-500 h-8 w-8"
-                        onClick={() => unarchiveItem(item.id)}
-                        title="Désarchiver"
-                      >
-                        <Undo className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="glass"
-                        size="icon"
-                        className="rounded-xl text-red-500 h-8 w-8"
-                        onClick={() => deleteItem(item.id)}
-                        title="Supprimer"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </GlassCardContent>
-                </GlassCard>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {items.length === 0 && !loading && (
-        <GlassCard className="border-dashed border-2" hover={false}>
-          <GlassCardContent className="flex flex-col items-center justify-center py-12">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-4">
-              <Plus className="h-8 w-8 text-purple-500" />
-            </div>
-            <p className="text-muted-foreground">Aucun élément dans cette liste</p>
-            <p className="text-sm text-muted-foreground mt-1">Ajoutez votre premier élément ci-dessus</p>
-          </GlassCardContent>
-        </GlassCard>
-      )}
-
-      {/* Voice input confirmation modal */}
-      {parsedVoiceItems && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <GlassCard className="max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
-            <GlassCardContent className="p-6">
-              <h3 className="text-xl font-semibold mb-4">
-                {parsedVoiceItems.length === 1
-                  ? 'Ajouter cet élément ?'
-                  : `Ajouter ${parsedVoiceItems.length} éléments ?`}
-              </h3>
-
-              <div className="max-h-60 overflow-y-auto space-y-2 mb-4">
-                {parsedVoiceItems.map((item, index) => (
-                  <div
-                    key={index}
-                    className="p-3 rounded-xl bg-muted/50 border border-border"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground text-sm">#{index + 1}</span>
-                      <span className="flex-1">{item.content}</span>
-                      {item.priority !== 'normal' && (
-                        <Flag
-                          className={`h-4 w-4 ${item.priority === 'urgent'
-                            ? 'text-red-500'
-                            : item.priority === 'high'
-                              ? 'text-orange-500'
-                              : 'text-gray-400'
-                            }`}
-                          fill="currentColor"
-                        />
-                      )}
-                    </div>
+      {
+        groupedByCategory ? (
+          // Category view
+          <div className="space-y-4">
+            {Object.entries(itemsByCategory)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([category, categoryItems]) => (
+                <div key={category} className="space-y-2">
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium ${getCategoryColor(category as any)}`}>
+                    {category}
+                    <span className="opacity-70">({categoryItems.length})</span>
                   </div>
+                  <div className="space-y-2">
+                    {categoryItems.map((item) => (
+                      <SortableItem
+                        key={item.id}
+                        item={item}
+                        reminder={getReminderByItemId(item.id)}
+                        onToggle={() => toggleItemComplete(item.id)}
+                        onDelete={() => deleteItem(item.id)}
+                        onUpdatePriority={(priority) => handleUpdatePriority(item.id, priority)}
+                        onSetReminder={() => handleSetReminder(item)}
+                        onUpdateContent={(content) => updateItem(item.id, { content })}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        ) : (
+          // List view with drag and drop
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={sortedPendingItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2">
+                {sortedPendingItems.map((item) => (
+                  <SortableItem
+                    key={item.id}
+                    item={item}
+                    reminder={getReminderByItemId(item.id)}
+                    onToggle={() => toggleItemComplete(item.id)}
+                    onDelete={() => deleteItem(item.id)}
+                    onUpdatePriority={(priority) => handleUpdatePriority(item.id, priority)}
+                    onSetReminder={() => handleSetReminder(item)}
+                    onUpdateContent={(content) => updateItem(item.id, { content })}
+                  />
                 ))}
               </div>
+            </SortableContext>
+          </DndContext>
+        )
+      }
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={handleCancelVoiceItems}
-                  className="flex-1 rounded-xl"
-                >
-                  Annuler
-                </Button>
-                <Button
-                  onClick={handleConfirmVoiceItems}
-                  className="flex-1 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-                >
-                  Ajouter
-                </Button>
+      {/* Completed items */}
+      {
+        completedItems.length > 0 && (
+          <div className="space-y-2">
+            <button
+              onClick={() => setShowCompleted(!showCompleted)}
+              className="text-sm font-medium text-muted-foreground flex items-center gap-2 hover:text-foreground transition-colors w-full"
+            >
+              <Check className="h-4 w-4 text-green-500" />
+              Complétés ({completedItems.length})
+              <span className={`transition-transform ml-auto ${showCompleted ? 'rotate-180' : ''}`}>▼</span>
+            </button>
+            {showCompleted && (
+              <div className="space-y-2">
+                {completedItems.map((item) => (
+                  <GlassCard key={item.id} className="opacity-70" hover={false}>
+                    <GlassCardContent className="flex items-center gap-3 p-3">
+                      <button
+                        onClick={() => toggleItemComplete(item.id)}
+                        className="h-6 w-6 rounded-lg border-2 border-green-500 bg-green-500 flex items-center justify-center shrink-0"
+                        data-no-swipe="true"
+                      >
+                        <Check className="h-3.5 w-3.5 text-white" />
+                      </button>
+                      <textarea
+                        readOnly
+                        value={item.content}
+                        onInput={(e) => {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          target.style.height = `${target.scrollHeight}px`;
+                        }}
+                        rows={1}
+                        className="flex-1 line-through text-muted-foreground bg-transparent border-none focus:outline-none resize-none overflow-hidden whitespace-pre-wrap break-words p-0"
+                        style={{ height: 'auto' }}
+                      />
+                      <div className="flex gap-1 shrink-0" data-no-swipe="true">
+                        <Button
+                          variant="glass"
+                          size="icon"
+                          className="rounded-xl text-blue-500 h-8 w-8"
+                          onClick={() => archiveItem(item.id)}
+                          title="Archiver"
+                        >
+                          <Archive className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="glass"
+                          size="icon"
+                          className="rounded-xl text-red-500 h-8 w-8"
+                          onClick={() => deleteItem(item.id)}
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </GlassCardContent>
+                  </GlassCard>
+                ))}
               </div>
+            )}
+          </div>
+        )
+      }
+
+      {/* Archived items section */}
+      {
+        archivedItems.length > 0 && (
+          <div className="space-y-2">
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className="text-sm font-medium text-muted-foreground flex items-center gap-2 hover:text-foreground transition-colors"
+            >
+              <Archive className="h-4 w-4" />
+              Archivés ({archivedItems.length})
+              <span className={`transition-transform ${showArchived ? 'rotate-180' : ''}`}>▼</span>
+            </button>
+            {showArchived && (
+              <div className="space-y-2">
+                {archivedItems.map((item) => (
+                  <GlassCard key={item.id} className="opacity-50" hover={false}>
+                    <GlassCardContent className="flex items-center gap-3 p-3">
+                      <Archive className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <textarea
+                        readOnly
+                        value={item.content}
+                        onInput={(e) => {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          target.style.height = `${target.scrollHeight}px`;
+                        }}
+                        rows={1}
+                        className="flex-1 line-through text-sm text-muted-foreground bg-transparent border-none focus:outline-none resize-none overflow-hidden whitespace-pre-wrap break-words p-0"
+                        style={{ height: 'auto' }}
+                      />
+                      <div className="flex gap-1 shrink-0" data-no-swipe="true">
+                        <Button
+                          variant="glass"
+                          size="icon"
+                          className="rounded-xl text-blue-500 h-8 w-8"
+                          onClick={() => unarchiveItem(item.id)}
+                          title="Désarchiver"
+                        >
+                          <Undo className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="glass"
+                          size="icon"
+                          className="rounded-xl text-red-500 h-8 w-8"
+                          onClick={() => deleteItem(item.id)}
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </GlassCardContent>
+                  </GlassCard>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      {/* Empty state */}
+      {
+        items.length === 0 && !loading && (
+          <GlassCard className="border-dashed border-2" hover={false}>
+            <GlassCardContent className="flex flex-col items-center justify-center py-12">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-4">
+                <Plus className="h-8 w-8 text-purple-500" />
+              </div>
+              <p className="text-muted-foreground">Aucun élément dans cette liste</p>
+              <p className="text-sm text-muted-foreground mt-1">Ajoutez votre premier élément ci-dessus</p>
             </GlassCardContent>
           </GlassCard>
-        </div>
-      )}
+        )
+      }
+
+      {/* Voice input confirmation modal */}
+      {
+        parsedVoiceItems && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <GlassCard className="max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
+              <GlassCardContent className="p-6">
+                <h3 className="text-xl font-semibold mb-4">
+                  {parsedVoiceItems.length === 1
+                    ? 'Ajouter cet élément ?'
+                    : `Ajouter ${parsedVoiceItems.length} éléments ?`}
+                </h3>
+
+                <div className="max-h-60 overflow-y-auto space-y-2 mb-4">
+                  {parsedVoiceItems.map((item, index) => (
+                    <div
+                      key={index}
+                      className="p-3 rounded-xl bg-muted/50 border border-border"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-sm">#{index + 1}</span>
+                        <span className="flex-1">{item.content}</span>
+                        {item.priority !== 'normal' && (
+                          <Flag
+                            className={`h-4 w-4 ${item.priority === 'urgent'
+                              ? 'text-red-500'
+                              : item.priority === 'high'
+                                ? 'text-orange-500'
+                                : 'text-gray-400'
+                              }`}
+                            fill="currentColor"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelVoiceItems}
+                    className="flex-1 rounded-xl"
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    onClick={handleConfirmVoiceItems}
+                    className="flex-1 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                  >
+                    Ajouter
+                  </Button>
+                </div>
+              </GlassCardContent>
+            </GlassCard>
+          </div>
+        )
+      }
 
       {/* DateTimePicker modal */}
       <DateTimePicker
@@ -629,7 +702,15 @@ export function ListDetail({ list, onBack }: ListDetailProps) {
                 : undefined)
             : undefined
         }
+        initialRecurrence={
+          reminderPickerItem && getReminderByItemId(reminderPickerItem.id)
+            ? {
+              type: getReminderByItemId(reminderPickerItem.id)!.recurrence_type || 'none',
+              interval: getReminderByItemId(reminderPickerItem.id)!.recurrence_interval || 1
+            } as any
+            : null
+        }
       />
-    </div>
+    </div >
   )
 }

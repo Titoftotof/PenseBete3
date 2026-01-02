@@ -388,19 +388,21 @@ export default function DashboardPage() {
                       }}
                       hover={false}
                     >
-                      <GlassCardContent className="flex items-center gap-3 p-4">
-                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${categoryInfo.gradient} flex items-center justify-center text-white shadow-md shrink-0`}>
-                          <Users className="h-5 w-5" />
+                      <GlassCardContent className="p-4 flex flex-col gap-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${categoryInfo.gradient} flex items-center justify-center text-white shadow-md shrink-0`}>
+                              <Users className="h-4 w-4" />
+                            </div>
+                            <p className="text-sm text-muted-foreground truncate">
+                              Partagé par {share.shared_with_email === '...' ? 'un utilisateur' : 'un utilisateur'}
+                            </p>
+                          </div>
+                          <div className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-500 text-xs font-medium shrink-0">
+                            {share.permission === 'write' ? 'Édition' : 'Lecture'}
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold truncate">{share.list!.name}</h3>
-                          <p className="text-sm text-muted-foreground truncate">
-                            Partagé par {share.shared_with_email === '...' ? 'un utilisateur' : 'un utilisateur'}
-                          </p>
-                        </div>
-                        <div className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-500 text-xs font-medium">
-                          {share.permission === 'write' ? 'Édition' : 'Lecture'}
-                        </div>
+                        <h3 className="font-semibold whitespace-pre-wrap break-words w-full">{share.list!.name}</h3>
                       </GlassCardContent>
                     </GlassCard>
                   )
@@ -435,36 +437,38 @@ export default function DashboardPage() {
                         onClick={() => handleListClick(list)}
                         hover={false}
                       >
-                        <GlassCardContent className="flex items-center gap-3 p-4">
-                          {dragHandle}
-                          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${categoryInfo.gradient} flex items-center justify-center text-white shadow-md shrink-0`}>
-                            {categoryInfo.icon}
+                        <GlassCardContent className="p-4 flex flex-col gap-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {dragHandle}
+                              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${categoryInfo.gradient} flex items-center justify-center text-white shadow-md shrink-0`}>
+                                {categoryInfo.icon}
+                              </div>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {categoryInfo.label}
+                                {getFolderName(list.folder_id) && ` • ${getFolderName(list.folder_id)}`}
+                              </p>
+                            </div>
+                            <div className="flex gap-1 shrink-0" data-no-swipe="true">
+                              <Button
+                                variant="glass"
+                                size="icon"
+                                className="rounded-xl h-8 w-8"
+                                onClick={(e) => handleShareList(e, list)}
+                              >
+                                <Share2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="glass"
+                                size="icon"
+                                className="rounded-xl text-red-500 h-8 w-8"
+                                onClick={(e) => handleDeleteList(e, list.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold truncate">{list.name}</h3>
-                            <p className="text-sm text-muted-foreground truncate">
-                              {categoryInfo.label}
-                              {getFolderName(list.folder_id) && ` • ${getFolderName(list.folder_id)}`}
-                            </p>
-                          </div>
-                          <div className="flex gap-1 shrink-0" data-no-swipe="true">
-                            <Button
-                              variant="glass"
-                              size="icon"
-                              className="rounded-xl"
-                              onClick={(e) => handleShareList(e, list)}
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="glass"
-                              size="icon"
-                              className="rounded-xl text-red-500"
-                              onClick={(e) => handleDeleteList(e, list.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <h3 className="font-semibold whitespace-pre-wrap break-words w-full">{list.name}</h3>
                         </GlassCardContent>
                       </GlassCard>
                     </SwipeableItem>

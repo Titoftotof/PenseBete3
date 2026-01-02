@@ -70,5 +70,7 @@ export interface Reminder {
   reminder_time: string
   is_sent: boolean
   sent_at?: string | null
+  recurrence_type?: 'daily' | 'weekly' | 'monthly' | 'yearly' | null
+  recurrence_interval?: number | null
   created_at: string
 }

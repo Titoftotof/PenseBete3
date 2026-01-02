@@ -1,31 +1,30 @@
 import { useState, useEffect } from 'react'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, addMonths, subMonths, startOfWeek, endOfWeek, isBefore } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, addMonths, subMonths, startOfWeek, endOfWeek, isBefore, addDays } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { GlassCard, GlassCardContent } from '@/components/ui/glass-card'
 import { Button } from '@/components/ui/button'
-import { Calendar, Clock, X, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { Calendar, Clock, X, ChevronLeft, ChevronRight, Trash2, Repeat } from 'lucide-react'
 
 interface DateTimePickerProps {
   isOpen: boolean
   onClose: () => void
-  onConfirm: (date: Date) => void
+  onConfirm: (date: Date, recurrence?: { type: 'daily' | 'weekly' | 'monthly' | 'yearly', interval: number }) => void
   onDelete?: () => void
   initialDate?: Date
+  initialRecurrence?: { type: 'daily' | 'weekly' | 'monthly' | 'yearly', interval: number } | null
 }
 
 const QUICK_OPTIONS = [
   { label: 'Dans 5 min', minutes: 5 },
   { label: 'Dans 1h', hours: 1 },
-  { label: 'Dans 2h', hours: 2 },
-  { label: 'Dans 4h', hours: 4 },
   { label: 'Demain 9h', hours: 24, hourOfDay: 9 },
-  { label: 'Demain 18h', hours: 24, hourOfDay: 18 },
-  { label: 'Semaine prochaine 9h', days: 7, hourOfDay: 9 },
+  { label: 'Fin semaine', type: 'weekend' },
+  { label: 'Fin mois', type: 'monthEnd' },
 ]
 
 const WEEK_DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
-export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDate }: DateTimePickerProps) {
+export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDate, initialRecurrence }: DateTimePickerProps) {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     if (initialDate) return new Date(initialDate)
@@ -43,33 +42,56 @@ export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDa
     return '09:00'
   })
 
+  const [recurrenceType, setRecurrenceType] = useState<'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'>('none')
+  const [recurrenceInterval, setRecurrenceInterval] = useState(1)
+
   useEffect(() => {
-    if (isOpen && initialDate) {
-      setSelectedDate(new Date(initialDate))
-      setCurrentMonth(new Date(initialDate))
-      const d = new Date(initialDate)
-      setSelectedTime(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`)
-    } else if (isOpen) {
-      setCurrentMonth(new Date())
+    if (isOpen) {
+      if (initialDate) {
+        setSelectedDate(new Date(initialDate))
+        setCurrentMonth(new Date(initialDate))
+        const d = new Date(initialDate)
+        setSelectedTime(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`)
+      } else {
+        setCurrentMonth(new Date())
+      }
+
+      if (initialRecurrence) {
+        setRecurrenceType(initialRecurrence.type)
+        setRecurrenceInterval(initialRecurrence.interval)
+      } else {
+        setRecurrenceType('none')
+        setRecurrenceInterval(1)
+      }
     }
-  }, [isOpen, initialDate])
+  }, [isOpen, initialDate, initialRecurrence])
 
   if (!isOpen) return null
 
-  const handleQuickOption = (option: typeof QUICK_OPTIONS[0]) => {
+  const handleQuickOption = (option: any) => {
     const now = new Date()
-    const result = new Date()
+    let result = new Date()
 
-    if (option.days) {
-      result.setDate(now.getDate() + option.days)
-    } else if (option.hours) {
-      result.setTime(now.getTime() + option.hours * 60 * 60 * 1000)
-    } else if ((option as any).minutes) {
-      result.setTime(now.getTime() + (option as any).minutes * 60 * 1000)
-    }
+    if (option.type === 'weekend') {
+      const day = now.getDay()
+      const daysUntilFriday = (5 - day + 7) % 7
+      result = addDays(now, daysUntilFriday === 0 ? 7 : daysUntilFriday)
+      result.setHours(18, 0, 0, 0) // Default to 18h for weekend
+    } else if (option.type === 'monthEnd') {
+      result = endOfMonth(now)
+      result.setHours(18, 0, 0, 0)
+    } else {
+      if (option.days) {
+        result.setDate(now.getDate() + option.days)
+      } else if (option.hours) {
+        result.setTime(now.getTime() + option.hours * 60 * 60 * 1000)
+      } else if (option.minutes) {
+        result.setTime(now.getTime() + option.minutes * 60 * 1000)
+      }
 
-    if (option.hourOfDay !== undefined) {
-      result.setHours(option.hourOfDay, 0, 0, 0)
+      if (option.hourOfDay !== undefined) {
+        result.setHours(option.hourOfDay, 0, 0, 0)
+      }
     }
 
     setSelectedDate(result)
@@ -81,7 +103,13 @@ export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDa
     const [hours, minutes] = selectedTime.split(':').map(Number)
     const result = new Date(selectedDate)
     result.setHours(hours, minutes, 0, 0)
-    onConfirm(result)
+
+    const recurrence = recurrenceType !== 'none'
+      ? { type: recurrenceType, interval: recurrenceInterval }
+      : undefined
+
+    onConfirm(result, recurrence)
+    onClose()
   }
 
   const formatDateLong = (date: Date): string => {
@@ -208,6 +236,46 @@ export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDa
             />
           </div>
 
+          {/* Recurrence */}
+          <div className="mb-4">
+            <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+              <Repeat className="h-4 w-4" />
+              Récurrence
+            </p>
+            <div className="space-y-2">
+              <select
+                value={recurrenceType}
+                onChange={(e) => setRecurrenceType(e.target.value as any)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 [&>option]:bg-gray-950 [&>option]:text-white"
+              >
+                <option value="none">Aucune</option>
+                <option value="daily">Tous les jours</option>
+                <option value="weekly">Toutes les semaines</option>
+                <option value="monthly">Tous les mois</option>
+                <option value="yearly">Tous les ans</option>
+              </select>
+
+              {recurrenceType !== 'none' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Tous les</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={recurrenceInterval}
+                    onChange={(e) => setRecurrenceInterval(parseInt(e.target.value) || 1)}
+                    className="w-16 bg-white/5 border border-white/10 rounded-xl px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {recurrenceType === 'daily' && 'jours'}
+                    {recurrenceType === 'weekly' && 'semaines'}
+                    {recurrenceType === 'monthly' && 'mois'}
+                    {recurrenceType === 'yearly' && 'ans'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Preview */}
           <div className="mb-4 p-3 rounded-xl bg-purple-500/10 border border-purple-500/30">
             <p className="text-sm text-center text-muted-foreground">
@@ -216,6 +284,14 @@ export function DateTimePicker({ isOpen, onClose, onConfirm, onDelete, initialDa
             <p className="text-base font-semibold text-center mt-1 capitalize">
               {formatDateLong(selectedDate)} à {selectedTime}
             </p>
+            {recurrenceType !== 'none' && (
+              <p className="text-xs text-center text-purple-400 mt-1">
+                Répétition : {recurrenceType === 'daily' ? 'Chaque jour' :
+                  recurrenceType === 'weekly' ? 'Chaque semaine' :
+                    recurrenceType === 'monthly' ? 'Chaque mois' : 'Chaque an'}
+                {recurrenceInterval > 1 ? ` (tous les ${recurrenceInterval})` : ''}
+              </p>
+            )}
           </div>
 
           {/* Actions */}

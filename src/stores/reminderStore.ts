@@ -8,8 +8,8 @@ interface ReminderStore {
   error: string | null
 
   fetchReminders: () => Promise<void>
-  createReminder: (itemId: string, reminderTime: Date) => Promise<Reminder | null>
-  updateReminder: (reminderId: string, reminderTime: Date) => Promise<void>
+  createReminder: (itemId: string, date: Date, recurrence?: { type: 'daily' | 'weekly' | 'monthly' | 'yearly', interval: number }) => Promise<Reminder | null>
+  updateReminder: (reminderId: string, date: Date, recurrence?: { type: 'daily' | 'weekly' | 'monthly' | 'yearly', interval: number } | null) => Promise<void>
   deleteReminder: (reminderId: string) => Promise<void>
   markAsSent: (reminderId: string) => Promise<void>
   getUpcomingReminders: () => Reminder[]
@@ -38,7 +38,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
   },
 
   // Create a new reminder for an item
-  createReminder: async (itemId: string, reminderTime: Date) => {
+  createReminder: async (itemId: string, reminderTime: Date, recurrence) => {
     set({ loading: true, error: null })
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -53,6 +53,9 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
         user_id: user.id,
         item_id: itemId,
         reminder_time: reminderTime.toISOString(),
+        recurrence_type: recurrence?.type || null,
+        recurrence_interval: recurrence?.interval || null,
+        is_sent: false
       })
       .select()
       .single()
@@ -73,16 +76,23 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
   },
 
   // Update reminder time
-  updateReminder: async (reminderId: string, reminderTime: Date) => {
+  updateReminder: async (reminderId: string, reminderTime: Date, recurrence) => {
     set({ loading: true, error: null })
+
+    const updates: any = {
+      reminder_time: reminderTime.toISOString(),
+      is_sent: false,
+      sent_at: null
+    }
+
+    if (recurrence !== undefined) {
+      updates.recurrence_type = recurrence?.type || null
+      updates.recurrence_interval = recurrence?.interval || null
+    }
 
     const { error } = await supabase
       .from('reminders')
-      .update({
-        reminder_time: reminderTime.toISOString(),
-        is_sent: false,
-        sent_at: null
-      })
+      .update(updates)
       .eq('id', reminderId)
 
     if (error) {
@@ -93,9 +103,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
           reminder.id === reminderId
             ? {
               ...reminder,
-              reminder_time: reminderTime.toISOString(),
-              is_sent: false,
-              sent_at: null
+              ...updates
             }
             : reminder
         ),
@@ -153,10 +161,12 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
     )
   },
 
-  // Get reminder by item ID
+  // Get reminder by item ID (prioritize unsent)
   getReminderByItemId: (itemId: string) => {
     const { reminders } = get()
-    return reminders.find((reminder) => reminder.item_id === itemId) || null
+    return reminders.find((r) => r.item_id === itemId && !r.is_sent) ||
+      reminders.find((r) => r.item_id === itemId) ||
+      null
   },
 }))
 
