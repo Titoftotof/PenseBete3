@@ -112,7 +112,7 @@ export default function DashboardPage() {
   // If a list is selected, show the list detail view
   if (selectedList) {
     return (
-      <div className="min-h-screen pb-20 md:pb-0">
+      <div className="min-h-screen pb-28 md:pb-0">
         <Header />
         <main className="container mx-auto px-4 py-6">
           <ListDetail list={selectedList} onBack={() => setSelectedList(null)} />
@@ -138,7 +138,7 @@ export default function DashboardPage() {
     const categoryInfo = categories.find((c) => c.id === selectedCategory)!
 
     return (
-      <div className="min-h-screen pb-20 md:pb-0">
+      <div className="min-h-screen pb-28 md:pb-0">
         <Header />
         <main className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between mb-6">
@@ -270,7 +270,7 @@ export default function DashboardPage() {
 
   // Default: show categories overview with sidebar
   return (
-    <div className="min-h-screen pb-20 md:pb-0">
+    <div className="min-h-screen pb-28 md:pb-0">
       <Header />
 
       <div className="flex">
