@@ -10,11 +10,8 @@ export interface SharedList {
   shared_with_user_id?: string
   permission: SharePermission
   created_at: string
-  list?: {
-    name: string
-    category: string
-    folder_id?: string
-  }
+  list_name?: string
+  list_category?: string
 }
 
 interface ShareStore {
@@ -23,7 +20,7 @@ interface ShareStore {
   error: string | null
 
   fetchShares: (listId: string) => Promise<void>
-  shareList: (listId: string, email: string, permission: SharePermission) => Promise<SharedList | null>
+  shareList: (listId: string, email: string, permission: SharePermission, listName: string, listCategory: string) => Promise<SharedList | null>
   updateSharePermission: (shareId: string, permission: SharePermission) => Promise<void>
   removeShare: (shareId: string) => Promise<void>
   fetchSharedWithMe: () => Promise<void>
@@ -53,7 +50,7 @@ export const useShareStore = create<ShareStore>((set) => ({
   },
 
   // Share a list with someone
-  shareList: async (listId: string, email: string, permission: SharePermission) => {
+  shareList: async (listId: string, email: string, permission: SharePermission, listName: string, listCategory: string) => {
     set({ loading: true, error: null })
 
     const { data, error } = await supabase
@@ -62,6 +59,8 @@ export const useShareStore = create<ShareStore>((set) => ({
         list_id: listId,
         shared_with_email: email.toLowerCase(),
         permission,
+        list_name: listName,
+        list_category: listCategory,
       })
       .select()
       .single()
@@ -126,7 +125,7 @@ export const useShareStore = create<ShareStore>((set) => ({
 
     const { data, error } = await supabase
       .from('shared_lists')
-      .select('*, list:lists(name, category, folder_id)')
+      .select('*')
       .eq('shared_with_email', user.email.toLowerCase())
       .order('created_at', { ascending: false })
 

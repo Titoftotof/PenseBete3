@@ -24,7 +24,7 @@ export function ShareDialog({ list, onClose }: ShareDialogProps) {
     e.preventDefault()
     if (!email.trim()) return
 
-    const result = await shareList(list.id, email.trim(), permission)
+    const result = await shareList(list.id, email.trim(), permission, list.name, list.category)
     if (result) {
       setEmail('')
     }

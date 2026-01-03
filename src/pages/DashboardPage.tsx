@@ -365,8 +365,8 @@ export default function DashboardPage() {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {sharedWithMe.map((share) => {
-                  if (!share.list) return null
-                  const categoryInfo = categories.find((c) => c.id === share.list!.category) || categories[0]
+                  if (!share.list_name) return null
+                  const categoryInfo = categories.find((c) => c.id === share.list_category) || categories[0]
 
                   return (
                     <GlassCard
@@ -376,9 +376,9 @@ export default function DashboardPage() {
                         // Construct a List object from the share info
                         const list: List = {
                           id: share.list_id,
-                          name: share.list!.name,
-                          category: share.list!.category as ListCategory,
-                          folder_id: share.list!.folder_id,
+                          name: share.list_name!,
+                          category: share.list_category as ListCategory,
+                          folder_id: undefined,
                           user_id: '', // Not needed for display
                           position: 0,
                           created_at: share.created_at,
@@ -395,14 +395,14 @@ export default function DashboardPage() {
                               <Users className="h-4 w-4" />
                             </div>
                             <p className="text-sm text-muted-foreground truncate">
-                              Partagé par {share.shared_with_email === '...' ? 'un utilisateur' : 'un utilisateur'}
+                              Partagé avec moi
                             </p>
                           </div>
                           <div className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-500 text-xs font-medium shrink-0">
                             {share.permission === 'write' ? 'Édition' : 'Lecture'}
                           </div>
                         </div>
-                        <h3 className="font-semibold whitespace-pre-wrap break-words w-full">{share.list!.name}</h3>
+                        <h3 className="font-semibold whitespace-pre-wrap break-words w-full">{share.list_name}</h3>
                       </GlassCardContent>
                     </GlassCard>
                   )
