@@ -63,7 +63,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="min-h-[100dvh]">
+    <div className="min-h-screen pb-20">
       {/* Header */}
       <div className="sticky top-0 z-10 glass border-b">
         <div className="container mx-auto px-4 py-4">
@@ -79,7 +79,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-4 space-y-4 pb-40 pb-safe">
+      <div className="container mx-auto px-4 py-4 space-y-4">
         {/* Calendar */}
         <CalendarView
           items={itemsWithDueDates}

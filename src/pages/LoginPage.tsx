@@ -133,11 +133,10 @@ export default function LoginPage() {
 
           {message && (
             <div
-              className={`mt-4 p-3 rounded-xl text-sm text-center ${
-                message.type === 'success'
+              className={`mt-4 p-3 rounded-xl text-sm text-center ${message.type === 'success'
                   ? 'bg-green-500/20 text-green-700 dark:text-green-300'
                   : 'bg-red-500/20 text-red-700 dark:text-red-300'
-              }`}
+                }`}
             >
               {message.text}
             </div>
