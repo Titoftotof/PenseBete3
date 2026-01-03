@@ -27,8 +27,8 @@ export function BottomTabBar({ selectedCategory, onCategorySelect, onCreateList,
               className="relative flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all duration-200"
             >
               <div className={`flex items-center justify-center transition-all duration-200 ${selectedCategory === tab.id
-                  ? `${tab.activeColor} bg-white/30 dark:bg-slate-800/30 scale-105`
-                  : 'text-muted-foreground hover:text-foreground'
+                ? `${tab.activeColor} bg-white/30 dark:bg-slate-800/30 scale-105`
+                : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {tab.icon}
@@ -39,8 +39,8 @@ export function BottomTabBar({ selectedCategory, onCategorySelect, onCreateList,
                 )}
               </div>
               <span className={`text-xs mt-1 font-medium ${selectedCategory === tab.id
-                  ? `${tab.activeColor}`
-                  : 'text-muted-foreground hover:text-foreground'
+                ? `${tab.activeColor}`
+                : 'text-muted-foreground hover:text-foreground'
                 }`}>{tab.label}</span>
             </button>
           ))}
@@ -60,8 +60,8 @@ export function BottomTabBar({ selectedCategory, onCategorySelect, onCreateList,
               className="relative flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all duration-200"
             >
               <div className={`flex items-center justify-center transition-all duration-200 ${selectedCategory === tab.id
-                  ? `${tab.activeColor} bg-white/30 dark:bg-slate-800/30 scale-105`
-                  : 'text-muted-foreground hover:text-foreground'
+                ? `${tab.activeColor} bg-white/30 dark:bg-slate-800/30 scale-105`
+                : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {tab.icon}
@@ -72,8 +72,8 @@ export function BottomTabBar({ selectedCategory, onCategorySelect, onCreateList,
                 )}
               </div>
               <span className={`text-xs mt-1 font-medium ${selectedCategory === tab.id
-                  ? `${tab.activeColor}`
-                  : 'text-muted-foreground hover:text-foreground'
+                ? `${tab.activeColor}`
+                : 'text-muted-foreground hover:text-foreground'
                 }`}>{tab.label}</span>
             </button>
           ))}

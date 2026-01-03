@@ -63,7 +63,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-[100dvh] pb-32">
       {/* Header */}
       <div className="sticky top-0 z-10 glass border-b">
         <div className="container mx-auto px-4 py-4">
