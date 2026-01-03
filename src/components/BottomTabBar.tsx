@@ -18,7 +18,7 @@ const tabs: { id: ListCategory; label: string; icon: React.ReactNode; activeColo
 export function BottomTabBar({ selectedCategory, onCategorySelect, onCreateList, listCounts }: BottomTabBarProps) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-[60] md:hidden">
-      <div className="glass border-t border-white/20 px-2 pb-safe">
+      <div className="bg-background border-t border-border px-2 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
         <div className="flex items-center justify-around py-2">
           {tabs.slice(0, 2).map((tab) => (
             <button
